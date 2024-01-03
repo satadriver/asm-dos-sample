@@ -1,0 +1,133 @@
+.386p
+code1 segment para use16
+assume cs:code1
+mov ax,20h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+
+mov edi,0
+mov ecx,0ffh
+mov al,41h
+rep stosb
+
+mov ax,18h
+ltr ax
+
+db 0eah
+dw 0
+dw 28h
+
+toreal:
+clts
+mov ax,20h
+mov ss,ax
+mov es,ax
+
+mov eax,cr0
+and eax,0fffffffeh
+mov cr0,eax
+db 0eah
+dw offset main1
+dw seg main1
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+mov ax,10h
+mov es,ax
+mov ss,ax
+mov esp,1000h
+mov edi,8000h
+
+pushfd
+pop eax
+stosd
+mov eax,cr0
+stosd
+mov eax,12345678h
+stosd
+
+db 0eah
+dw offset toreal
+dw 0
+dw 8
+code2 ends
+
+tssseg segment para use16
+dd 25 dup (0)
+dw 0
+dw $+2
+db 100h dup (0)
+db 0ffh
+tssseg ends
+
+gdtseg segment para use16
+gdtptr dw gdtlen-1
+gdtbase dd 0
+gdtaddr0 dq 0
+gdtaddr1 dq 000098000000ffffh
+gdtaddr2 dq 004092000000ffffh
+gdtaddr3 dq 0000890000000168h
+gdtaddr4 dq 0000920b8000ffffh
+gdtaddr5 dq 004098000000ffffh
+gdtlen=$-gdtaddr0
+gdtseg ends
+
+code segment para use16
+assume cs:code,ds:gdtseg
+start:
+xor eax,eax
+mov ax,gdtseg
+mov ds,ax
+shl eax,4
+xor esi,esi
+mov si,offset gdtaddr0
+add eax,esi
+mov dword ptr ds:[gdtbase],eax
+
+xor eax,eax
+mov ax,code1
+shl eax,4
+mov word ptr ds:[gdtaddr1+2],ax
+shr eax,16
+mov byte ptr ds:[gdtaddr1+4],al
+
+mov ax,code2
+shl eax,4
+mov word ptr ds:[gdtaddr5+2],ax
+shr eax,16
+mov byte ptr ds:[gdtaddr5+4],al
+
+xor eax,eax
+mov ax,tssseg
+shl eax,4
+mov word ptr ds:[gdtaddr3+2],ax
+shr eax,16
+mov byte ptr ds:[gdtaddr3+4],al
+
+mov ax,3
+int 10h
+
+cli
+lgdt qword ptr ds:[gdtptr]
+
+mov al,2
+out 92h,al
+mov eax,cr0
+or eax,1
+mov cr0,eax
+db 0eah
+dw 0
+dw 8
+
+main1:
+mov ax,2000h
+mov ss,ax
+mov ah,4ch
+int 21h
+code ends
+end start
+
+

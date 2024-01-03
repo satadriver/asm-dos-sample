@@ -1,0 +1,38 @@
+.model small
+.code
+start:
+push ds
+mov ax,0
+push ax
+
+cli
+mov es,ax
+mov di,6ch
+stosw
+
+mov ax,2000h
+stosw
+
+mov ax,2000h
+mov es,ax
+mov ax,@code
+mov ds,ax
+mov si,offset int1bproc
+mov di,0
+mov cx,int1blen
+rep movsb
+
+sti
+retf
+
+int1bproc:
+cli
+mov ax,3
+int 10h
+mov al,20h
+out 20h,al
+mov ah,4ch
+int 21h
+int1blen=$-int1bproc
+
+end start

@@ -1,0 +1,17 @@
+#include <\masm32\include\resource.h>
+#define DlgMain 	0x1000
+#define ButtonOpen	0x1001
+#define ButtonClose	0x1002
+#define EditBmpName	0x1003
+
+
+DlgMain DIALOG 100,100,200,200
+STYLE DS_MODALFRAME | WS_POPUP |WS_VISIBLE |WS_CAPTION |WS_SYSMENU | WS_THICKFRAME
+CAPTION "打开BMP对话框"
+FONT 11 ,"楷体"
+{
+edittext EditBmpName,30,40,140,20
+ltext "请点击打开按钮查找要显示的BMP文件:",-1,30,80,140,20
+defpushbutton "打开BMP文件",ButtonOpen,30,120,60,30
+DEFPUSHBUTTON "关闭程序" ,ButtonClose,120,120,60,30
+}

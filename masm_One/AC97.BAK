@@ -1,0 +1,616 @@
+.386p
+stack segment stack
+db 100h dup (0)
+stack ends
+
+slot_seg segment para use16
+dd 4000h dup (0)
+slot_seg ends
+
+slot_seg1 segment para use16
+dd 4000h dup (0)
+slot_seg1 ends
+
+;slot_seg2 segment para use16
+;dd 4000h dup (0)
+;slot_seg2 ends
+
+;slot_seg3 segment para use16
+;dd 4000h dup (0)
+;slot_seg3 ends
+
+
+data segment para use16
+prdtable                    dq 0000ffff00000000h
+                            dq 0000ffff00000000h
+                            dq 0000ffff00000000h
+                            dq 8000ffff00000000h
+prdbase                     dd 0
+ac97mixerbase 	           dw 0
+ac97masterbase 	           dw 0
+di_pos                      dw 0
+si_pos                      dw 0
+wavhead                     db 100h dup (0)
+wav_data_size               dd 0
+wav_data_start              dd 0
+handle                      dw 0
+volume                      dw 480h
+wav_data                    db 8000h dup (0)
+block                       dd 0
+block_num		              dw 0
+block_detail		           dw 0
+file_end_flag               db 0
+ac97_int_pin                db 0
+ac97_int_line               db 4         ;most significant must be 0 to enable APIC 
+bus_dev_func                dd 0
+old_int_ip                  dw 0
+old_int_cs                  dw 0
+slot0                       dw 9800h
+slot4321                    dt 0
+slot8765                    dt 0
+slotcba9                    dt 0
+
+wavfilename_limit_lenth     db 40h 
+wavfilename_fact_lenth      db 0
+wavfilename                 db 40h dup (0)
+msg_input               db 'Please input the music name(such as "f:\wavefile\start.wav") to play:',0dh,0ah,24h
+msg_openfailure         db 'Not found file,press any key to quit...',0ah,0dh,24h
+msg_nodevice            db 'Not found ac97 devices,press any key to quit...',0ah,0dh,24h
+msg_fileend             db 'File end,press anykey to continue...',0ah,0dh,24h
+data ends
+
+
+
+new_int_soundcard segment para use16
+assume cs:new_int_soundcard
+pushad
+push ds
+push es
+push fs
+push gs
+mov ax,cs
+mov ds,ax
+mov ax,0b800h
+mov es,ax
+mov si,offset msg_soundcard_int
+mov di,400h
+cld
+show_new_int_msg:
+lodsb
+cmp al,0
+jz new_int_ret
+mov ah,0ch
+stosw
+jmp show_new_int_msg
+new_int_ret:
+mov dx,cs:[ac97_busmaster_reg]
+add dx,16h
+mov ax,4
+out dx,ax
+mov al,20h
+out 20h,al
+pop gs
+pop fs
+pop es
+pop ds
+popad
+iret
+ac97_busmaster_reg 	dw 0
+msg_soundcard_int 	db 'AC97 sound card interrupt occurred!',0
+new_int_soundcard ends
+
+
+
+code segment para use16
+assume cs:code
+start:
+sti
+main proc near
+call near ptr init
+call near ptr get_ac97port
+call near ptr set_SDcard_int
+toreadfile:
+call near ptr readfile
+call near ptr prepare_slot
+call near ptr playwav
+jmp toreadfile
+main endp
+
+
+
+init proc near
+mov ax,3
+int 10h
+mov ax,data
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+xor eax,eax
+mov ax,slot_seg
+shl eax,4
+mov dword ptr ds:[prdtable],eax
+xor eax,eax
+mov ax,slot_seg1
+shl eax,4
+mov dword ptr ds:[prdtable+8],eax
+xor eax,eax
+mov ax,slot_seg2
+shl eax,4
+mov dword ptr ds:[prdtable+10h],eax
+xor eax,eax
+mov ax,slot_seg3
+shl eax,4
+mov dword ptr ds:[prdtable+18h],eax
+
+xor eax,eax
+mov ax,data
+shl eax,4
+xor ebx,ebx
+mov bx,offset prdtable
+add eax,ebx
+mov ds:[prdbase],eax
+
+mov ah,9
+mov dx,offset msg_input
+int 21h
+mov ah,0ah
+mov dx,offset wavfilename_limit_lenth
+int 21h
+cld
+mov di,offset wavfilename
+xor bx,bx
+mov bl,ds:[wavfilename_fact_lenth]
+add di,bx
+mov al,0
+stosb
+
+mov ax,3d00h
+mov dx,offset wavfilename
+int 21h
+jnc openfileOK
+jmp openfile_failure
+OPENFILEok:
+mov bx,ax
+mov ds:[handle],ax
+mov ax,3f00h
+mov cx,100h
+mov dx,offset wavhead
+int 21h
+mov esi,dword ptr ds:[wavhead+10h]
+sub si,10h
+add si,offset wavhead
+add si,24h
+lodsd
+cmp eax,74636166h
+jnz nofactblock
+add si,12
+nofactblock:
+lodsd
+sub si,offset wavhead
+mov ds:[wav_data_start],esi
+sub eax,8
+mov ds:[wav_data_size],eax
+
+mov ax,word ptr ds:[wavhead+20h]
+mov bx,2048
+shl bx,2
+mul bx
+mov word ptr ds:[block],ax
+mov word ptr ds:[block+2],dx
+
+mov dx,word ptr ds:[wav_data_size+2]
+mov ax,word ptr ds:[wav_data_size]
+mov bx,word ptr ds:[block]
+div bx
+mov ds:[block_num],ax
+mov ds:[block_detail],dx
+
+mov ax,4200h
+mov bx,ds:[handle]
+mov cx,word ptr ds:[wav_data_start+2]
+mov dx,word ptr ds:[wav_data_start]
+int 21h
+ret
+openfile_failure:
+mov ah,9
+mov dx,offset msg_openfailure
+int 21h
+mov ah,0
+int 16h
+jmp main
+init endp
+
+
+
+
+get_ac97port proc near
+mov eax,80000008h
+ac97port:
+push eax
+mov dx,0cf8h
+out dx,eax
+mov dx,0cfch
+in eax,dx
+and al,0
+cmp eax,04010000h
+jz get_ac97_basereg
+pop eax
+add eax,100h
+cmp eax,80ffff08h
+jbe ac97port
+no_ac97_device:
+mov ah,9
+mov dx,offset msg_nodevice
+int 21h
+quit:
+mov ah,0
+int 16h
+mov ah,4ch
+int 21h
+get_ac97_basereg:
+pop eax
+and al,0
+mov ds:[bus_dev_func],eax
+add eax,10h
+mov dx,0cf8h
+out dx,eax
+mov dx,0cfch
+in eax,dx
+test al,1
+jz no_ac97_device
+and al,0feh
+mov ds:[ac97mixerbase],ax
+mov eax,ds:[bus_dev_func]
+add eax,14h
+mov dx,0cf8h
+out dx,eax
+mov dx,0cfch
+in eax,dx
+and al,0feh
+mov ds:[ac97masterbase],ax
+
+mov bx,new_int_soundcard
+mov es,bx
+mov es:[ac97_busmaster_reg],ax
+ret
+get_ac97port endp
+
+
+
+
+
+set_SDcard_int proc near
+mov eax,ds:[bus_dev_func]
+add eax,3ch
+mov dx,0cf8h
+out dx,eax
+mov dx,0cfch
+mov al,ds:[ac97_int_line]
+out dx,al
+
+mov eax,ds:[bus_dev_func]
+add eax,3dh
+mov dx,0cf8h
+out dx,eax
+mov dx,0cfch
+in al,dx
+mov ds:[ac97_int_pin],al
+
+mov eax,8000f860h
+add al,byte ptr ds:[ac97_int_pin]
+dec al
+mov dx,0cf8h
+out dx,eax
+mov al,ds:[ac97_int_line]
+mov dx,0cfch
+out dx,al
+
+mov eax,8000f8d0h
+mov dx,0cf8h
+out dx,eax
+mov dx,0cfch
+in eax,dx
+or eax,100h
+out dx,eax
+
+mov ax,0
+mov es,ax
+mov al,ds:[ac97_int_line]
+movzx ax,al
+mov di,ax
+shl di,2
+push word ptr es:[di]
+pop word ptr ds:[old_int_ip]
+mov ax,0                     ;offset new_int_soundcard
+stosw
+push word ptr es:[di]
+pop word ptr ds:[old_int_cs]
+mov ax,new_int_soundcard
+stosw
+
+in al,21h
+mov bl,byte ptr ds:[ac97_int_line]
+movzx bx,bl
+btr ax,bx
+out 21h,al
+ret
+set_SDCARD_int endp
+
+
+
+
+
+
+readfile proc near
+cmp byte ptr ds:[file_end_flag],0ffh
+jnz not_end
+mov ax,3e00h
+mov bx,ds:[handle]
+int 21h
+mov byte ptr ds:[file_end_flag],0
+mov ah,9
+mov dx,offset msg_fileend
+int 21h
+
+mov ah,0
+int 16h
+jmp main
+not_end:
+cmp word ptr ds:[block_num],0
+jnz readblock
+mov ax,3f00h
+mov bx,ds:[handle]
+mov cx,ds:[block_detail]
+mov dx,offset wav_data
+int 21h
+
+mov ax,ds
+mov es,ax
+mov cx,word ptr ds:[block]
+sub cx,ds:[block_detail]
+mov di,ds:[block_detail]
+add di,offset wav_data
+mov al,0
+rep stosb
+mov byte ptr ds:[file_end_flag],0ffh
+jmp readfile_ret
+readblock:
+mov ax,3f00h
+mov bx,ds:[handle]
+mov cx,word ptr ds:[block]
+mov dx,offset wav_data
+int 21h
+dec word ptr ds:[block_num]
+readfile_ret:
+ret
+readfile endp
+
+
+
+prepare_slot proc near
+mov ax,slot_seg
+mov es,ax
+mov si,offset wav_data
+mov ds:[si_pos],si
+mov word ptr ds:[di_pos],0
+mov ax,word ptr ds:[wavhead+16h]
+cmp ax,1
+jz channel_1
+channel_2:
+mov ax,word ptr ds:[wavhead+22h]
+shr ax,3
+cmp ax,1
+jz channel2_sample1
+jmp channel2_sample2
+channel_1:
+mov ax,word ptr ds:[wavhead+22h]
+shr ax,3
+cmp ax,1
+jz channel1_sample1
+jmp channel1_sample2
+
+channel1_sample1:
+mov cx,4
+circle_0:
+push cx
+call set_mode_channel1sample1
+pop cx
+mov ax,es
+add ax,1000h
+mov es,ax
+loop circle_0
+ret
+
+channel1_sample2:
+mov cx,4
+circle_1:
+push cx
+call set_mode_channel1sample2
+pop cx
+mov ax,es
+add ax,1000h
+mov es,ax
+loop circle_1
+ret
+
+channel2_sample1:
+mov cx,4
+circle_2:
+push cx
+call set_mode_channel2sample1
+pop cx
+mov ax,es
+add ax,1000h
+mov es,ax
+loop circle_2
+ret
+
+channel2_sample2:
+mov cx,4
+circle_3:
+push cx
+call set_mode_channel2sample2
+pop cx
+mov ax,es
+add ax,1000h
+mov es,ax
+loop circle_3
+ret
+prepare_slot endp
+
+
+
+set_mode_channel1sample1 proc near
+mov cx,word ptr ds:[block]
+shr cx,2
+channel1sample1:
+push cx
+mov si,ds:[si_pos]
+lodsb
+mov byte ptr ds:[slot4321+9],al
+mov byte ptr ds:[slot4321+5],al
+mov ds:[si_pos],si
+call copy_wav_data
+pop cx
+loop channel1sample1
+ret
+set_mode_channel1sample1 endp
+
+set_mode_channel1sample2 proc near
+mov cx,word ptr ds:[block]
+shr cx,3
+channel1sample2:
+push cx
+mov si,ds:[si_pos]
+lodsb
+mov byte ptr ds:[slot4321+9],al
+lodsb
+mov byte ptr ds:[slot4321+5],al
+mov ds:[si_pos],si
+call copy_wav_data
+pop cx
+loop channel1sample2
+ret
+set_mode_channel1sample2 endp
+
+set_mode_channel2sample1 proc near
+mov cx,word ptr ds:[block]
+shr cx,3
+channel2sample1:
+push cx
+xor eax,eax
+mov si,ds:[si_pos]
+lodsw
+mov word ptr ds:[slot4321+8],ax
+shl eax,12
+mov dword ptr ds:[slot4321+4],eax
+mov ds:[si_pos],si
+call copy_wav_data
+pop cx
+loop channel2sample1
+ret
+set_mode_channel2sample1 endp
+
+set_mode_channel2sample2 proc near
+mov cx,word ptr ds:[block]
+shr cx,4
+channel2sample2:
+push cx
+xor eax,eax
+mov si,ds:[si_pos]
+lodsw
+mov word ptr ds:[slot4321+8],ax
+lodsw
+shl eax,12
+mov dword ptr ds:[slot4321+4],eax
+mov ds:[si_pos],si
+call copy_wav_data
+pop cx
+loop channel2sample2
+ret
+set_mode_channel2sample2 endp
+
+
+copy_wav_data proc near
+mov si,offset slot0
+mov di,ds:[di_pos]
+mov cx,8
+rep movsd
+mov ds:[di_pos],di
+ret
+copy_wav_data endp
+
+playwav proc near
+mov dx,ds:[ac97masterbase]
+add dx,2ch
+mov eax,2
+out dx,eax
+mov dx,ds:[ac97masterbase]
+add dx,1bh
+mov al,6
+out dx,al
+mov dx,ds:[ac97masterbase]
+add dx,10h
+mov eax,ds:[prdbase]
+out dx,eax
+mov dx,ds:[ac97mixerbase]
+add dx,2
+mov ax,ds:[volume]
+out dx,ax
+mov dx,ds:[ac97mixerbase]
+add dx,18h
+out dx,ax
+mov ax,480h
+mov dx,ds:[ac97mixerbase]
+add dx,36h
+out dx,ax
+mov dx,ds:[ac97mixerbase]
+add dx,38h
+out dx,ax
+
+mov dx,ds:[ac97mixerbase]
+add dx,26
+in ax,dx
+or ax,3
+out dx,ax
+add dx,2
+in ax,dx
+or ax,3
+out dx,ax
+add dx,2
+in ax,dx
+or ax,3
+out dx,ax
+
+mov dx,ds:[ac97mixerbase]
+add dx,2ch
+mov ax,word ptr ds:[wavhead+18h]
+out dx,ax
+add dx,2
+out dx,ax
+add dx,2
+out dx,ax
+add dx,2
+out dx,ax
+mov dx,ds:[ac97masterbase]
+add dx,15h
+mov al,3
+out dx,al
+
+mov dx,ds:[ac97masterbase]
+add dx,1bh
+mov al,5
+out dx,al
+intstatus:
+mov dx,ds:[ac97masterbase]
+add dx,16h
+in ax,dx
+test al,4
+jz intstatus
+ret
+playwav endp
+code ends
+
+
+end start

@@ -1,0 +1,42 @@
+.386
+.model flat, stdcall
+option casemap:none
+include /masm32/include/windows.inc
+include /masm32/include/kernel32.inc
+include /masm32/include/user32.inc
+include /masm32/include/advapi32.inc
+includelib /masm32/lib/kernel32.lib
+includelib /masm32/lib/user32.lib
+includelib /masm32/lib/advapi32.lib
+include /masm32/Macros/Strings.mac
+.code
+start proc
+local hSCManager:HANDLE
+local hService:HANDLE
+local acDriverPath[MAX_PATH]:CHAR
+   invoke OpenSCManager, NULL, NULL, SC_MANAGER_CREATE_SERVICE
+   .if eax != NULL
+        mov hSCManager, eax
+        push eax
+        invoke GetFullPathName, $CTA0("bmp1.sys"), sizeof acDriverPath, addr acDriverPath, esp
+        pop eax
+        invoke CreateService, hSCManager, $CTA0("bemp1"), $CTA0("Nice Melody bmp1"),\
+        SERVICE_START + DELETE, SERVICE_KERNEL_DRIVER,SERVICE_DEMAND_START, SERVICE_ERROR_IGNORE, addr acDriverPath,\
+        NULL, NULL, NULL, NULL, NULL
+     .if eax != NULL
+        mov hService, eax
+        invoke StartService, hService, 0, NULL
+        invoke DeleteService, hService
+        invoke CloseServiceHandle, hService
+     .else
+        invoke MessageBox, NULL, $CTA0("×¢²áÇý¶¯Ê§°Ü."), NULL, MB_ICONSTOP
+     .endif
+   invoke CloseServiceHandle, hSCManager
+   .else
+   invoke MessageBox, NULL, $CTA0("Can't connect to Service Control Manager."), NULL, MB_ICONSTOP
+   .endif
+   invoke ExitProcess, 0
+start endp
+end start 
+
+

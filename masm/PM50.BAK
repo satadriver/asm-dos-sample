@@ -1,0 +1,278 @@
+.386p
+code1 segment para use16
+assume cs:code1
+begin4:
+mov ax,20h
+ltr ax
+MOV AX,10H
+LLDT AX
+db 09ah
+dw offset begin1
+dw 4Ch
+code1len=$-begin4
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+begin3:mOV AX,1CH
+MOV DS,AX
+MOV ES,AX
+MOV FS,AX
+MOV GS,AX
+MOV eSI,0
+MOV eCX,0FFFFH
+MOV AL,2;;;;
+L0:
+MOV [eSI],AL
+INC eSi            ;;;;;;;
+LOOP L0
+MOV CX,0FFFFH
+L1:MOV AX,0FFFFH
+L2:DEC AX
+CMP AX,0
+JNZ L2
+DEC CX
+CMP CX,0
+JNZ L1                ;;;;
+db 09ah
+dw offset begin2
+dw 0
+dw 54h
+code2len=$-begin3
+CODE2 ENDS
+
+code3 segment para use32
+assume cs:code3
+begin1:
+xor eax,eax
+mov ax,2Ch
+mov ss,ax
+mov ax,1000h
+mov esp,eax
+mov ax,47h;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+push eax
+mov ax,1000h
+push eax
+xor eax,eax
+mov ax,17h;;;;;;;;;;;;;;;;;;;;;;;
+push  eax
+mov ax,offset begin3
+push eax
+retf
+code3len=$-begin1
+code3 ends
+
+
+code4 segment para use16
+assume cs:code4
+begin2:
+mov eax,cr0
+and eax,0fffffffeh
+mov cr0,eax
+db 0eah
+dw offset rm16
+dw seg rm16
+rm16:mov al,0
+out 92h,al
+mov ax,3
+int 10h
+mov ah,4ch
+int 21h
+code4len=$-begin2
+code4 ends
+
+gdtseg segment para use16
+gdtlen dw gdtend-1
+gdtbase dd 0
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 0000820000004fh
+gdt3 dq 0
+gdt4 dq 0000890000000068h
+gdtend=$-gdt0
+gdtseg ends
+
+ldtseg segment para use16
+ldt0 dq 0
+ldt1 dq 000098000000ffffh
+ldt2 dq 0040f8000000ffffh;;;;;;;;;;;;;;;;;;;
+ldt3 dq 0040f20a0000ffffh;;;;;;;;;;;;;;;;;;;;;;
+ldt4 dq 0
+ldt5 dq 0040920000000fffh
+ldt6 dq 0040b20000000fffh
+ldt7 dq 0040d20000000fffh
+ldt8 dq 0040f20000000fffh
+ldt9 dq 004098000000ffffh
+ldt10 dq 000098000000ffffh
+ldtseg ends
+
+tssseg segment PARA USE16
+DD 0
+DD 1000H
+DD 2CH
+DD 1000H
+DD 35H;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+DD 1000H
+DD 3EH;;;;;;;;;;;;;;;;;;;;
+DD 17 DUP (0)
+LDTADDR dd 10H;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+DW 0
+DW $+2
+DB 0FFH
+TSSSEG ENDS
+
+stack0 segment para use16
+db 1000h dup (0)
+stack0 ends
+stack1 segment para use16
+db 1000h dup (0)
+stack1 ends
+stack2 segment para use16
+db 1000h dup (0)
+stack2 ends
+stack3 segment para use16
+db 1000h dup (0)
+stack3 ends
+
+code0 segment para use16
+assume cs:code0
+START:
+XOR EAX,EAX
+MOV AX,GDTSEG
+MOV DS,AX
+SHL EAX,4
+XOR ESI,ESI
+MOV SI,OFFSET GDT0
+ADD EAX,ESI
+MOV DWORD PTR DS:[GDTBASE],EAX
+
+XOR EAX,EAX
+MOV AX,code0
+SHL EAX,4
+xor esi,esi
+mov si,offset main
+add eax,esi
+MOV WORD PTR DS:[GDT1+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT1+4],AL
+MOV BYTE PTR DS:[GDT1+7],AH
+
+XOR EAX,EAX
+MOV AX,ldtseg
+SHL EAX,4
+MOV WORD PTR DS:[GDT2+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT2+4],AL
+MOV BYTE PTR DS:[GDT2+7],AH
+
+
+XOR EAX,EAX
+MOV AX,TSSSEG
+SHL EAX,4
+MOV WORD PTR DS:[GDT4+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT4+4],AL
+MOV BYTE PTR DS:[GDT4+7],AH
+
+push ds
+mov ax,ldtseg
+mov ds,ax
+
+
+XOR EAX,EAX
+MOV AX,code1
+SHL EAX,4
+MOV WORD PTR DS:[lDT1+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[lDT1+4],AL
+MOV BYTE PTR DS:[lDT1+7],AH
+
+
+XOR EAX,EAX
+MOV AX,code3
+SHL EAX,4
+MOV WORD PTR DS:[lDT9+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[lDT9+4],AL
+MOV BYTE PTR DS:[lDT9+7],AH
+
+XOR EAX,EAX
+MOV AX,CODE2
+SHL EAX,4
+MOV WORD PTR DS:[lDT2+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[lDT2+4],AL
+MOV BYTE PTR DS:[lDT2+7],AH
+
+
+XOR EAX,EAX
+MOV AX,STACK0
+SHL EAX,4
+MOV WORD PTR DS:[lDT5+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[lDT5+4],AL
+MOV BYTE PTR DS:[lDT5+7],AH
+
+XOR EAX,EAX
+MOV AX,STACK1
+SHL EAX,4
+MOV WORD PTR DS:[lDT6+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[lDT6+4],AL
+MOV BYTE PTR DS:[LDT6+7],AH
+
+XOR EAX,EAX
+MOV AX,STACK2
+SHL EAX,4
+MOV WORD PTR DS:[LDT7+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[LDT7+4],AL
+MOV BYTE PTR DS:[LDT7+7],AH
+
+XOR EAX,EAX
+MOV AX,STACK3
+SHL EAX,4
+MOV WORD PTR DS:[LDT8+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[LDT8+4],AL
+MOV BYTE PTR DS:[LDT8+7],AH
+
+xor eax,eax
+mov ax,code4
+shl eax,4
+mov word ptr ds:[Ldt10+2],ax
+shr eax,16
+mov byte ptr ds:[Ldt10+4],al
+mov byte ptr ds:[Ldt10+7],ah
+
+mov ax,code1len-1
+mov word ptr ds:[Ldt1],ax
+mov ax,code2len-1
+mov word ptr ds:[Ldt2],ax
+
+mov ax,code3len-1
+mov word ptr ds:[Ldt9],ax
+mov ax,code4len-1
+mov word ptr ds:[Ldt10],ax
+
+mov ax,13h
+int 10h
+
+pop ds
+LGDT QWORD PTR DS:[GDTLEN]
+CLI
+MOV AL,2
+OUT 92H,AL
+MOV EAX,CR0
+OR EAX,1
+MOV CR0,EAX
+DB 0EAH
+dw 0
+DW 8 
+MAIN:
+DB 09AH
+DW 0
+DW 0CH
+
+CODE0 ENDS
+END START

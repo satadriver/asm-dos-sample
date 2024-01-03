@@ -1,0 +1,10 @@
+TARGETNAME=r8139
+TARGETPATH=obj
+TARGETTYPE=DRIVER
+
+TARGETLIBS=$(DDK_LIB_PATH)\ndis.lib
+
+
+
+SOURCES=driver.c \
+ioctrl.c

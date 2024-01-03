@@ -1,0 +1,54 @@
+.model small
+.DATA
+STR0 DB 100 DUP (0)
+.code
+start:
+mov al,0adh
+out 64h,al
+l0:
+in al,64h
+test aL,2
+jnz l0
+
+mov al,0f2h
+out 60h,al
+
+l1:
+IN AL,60H
+TEST AL,1
+JZ L1
+
+IN AL,60H
+CMP AL,0FAH
+JNZ QUIT
+L2:
+IN AL,64H
+TEST AL,1
+JZ L2
+
+IN  AL,60H
+MOV SI,OFFSET STR0
+MOV DS:[SI],AL
+INC SI
+IN AL,60H
+MOV DS:[SI],AL
+
+L3:
+IN AL,64H
+TEST AL,2
+JNZ L3
+MOV AL,0AEH
+OUT 64H,AL
+
+QUIT:IN AL,60H
+CMP AL,1
+JNZ QUIT
+
+MOV AH,9
+MOV DX,OFFSET STR0
+INT 21H
+MOV AH,0
+INT 16H
+     MOV AH,4CH
+     INT 21H
+     END START

@@ -1,0 +1,60 @@
+.386p
+code segment para use16
+assume cs:code
+start:
+push ds
+push word ptr 0
+mov eax,0
+mov ax,code
+shl eax,4
+mov ebx,0
+mov bx,offset gdt0
+add eax,ebx
+mov dword ptr cs:[gdtbase],eax
+
+lgdt qword ptr cs:[gdtlen]
+cli
+in al,0eeh
+mov eax,cr0
+or al,1
+mov cr0,eax
+mov bx,8
+mov fs,bx
+and al,0feh
+mov cr0,eax
+
+;mov ax,4f02h
+;mov bx,118h
+;int 10h
+;mov ax,4f06h
+;mov bx,0
+;mov cx,1024
+;int 10h
+mov esi,0
+mov eax,0
+sti
+mov bx,0ffffh
+l1:mov cx,1fffh
+mov esi,0
+l0:
+mov word ptr fs:[esi],ax
+add esi,2
+inc ax
+loop l0
+dec bx
+cmp bx,0
+jnz l1
+mov ah,0
+int 16h
+mov ax,3
+int 10h
+retf
+
+gdtlen dw 01fh
+gdtbase dd 0
+gdt0 dq 0
+gdt1 dq 0d5cf92400000ffffh
+gdt2 dq 00cf92000000ffffh
+gdt3 dq 000098000000ffffh
+code ends
+end start

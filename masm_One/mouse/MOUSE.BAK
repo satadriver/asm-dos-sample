@@ -1,0 +1,198 @@
+code segment
+assume cs:code
+start:
+mov al,0ffh
+out 21h,al
+out 0a1h,al
+cli
+mov ax,code
+mov ds,ax
+mov si,offset mouse
+mov ax,8000h
+mov es,ax
+mov di,0
+mov cx,mouselenth
+rep movsb
+
+mov ax,0
+mov es,ax
+mov di,1d0h
+stosw
+mov ax,8000h
+stosw
+
+l5:
+in al,64h
+test al,2
+jnz l5
+mov al,0adh
+out 64h,al
+l6:in al,64h
+test al,2
+jnz l6
+mov al,0a8h
+out 64h,al
+l7:
+in al,64h
+test al,2
+jnz l7
+mov al,0d4h
+out 64h,al
+l8:in al,64
+test al,2
+jnz l8
+l14:
+mov al,0f4h
+out 60h,al
+l13:
+in al,64h
+test al,1
+jz l13
+in al,60h
+cmp al,0fah
+jnz l14
+mov al,40h
+out 60h,al
+l00:
+in al,64h
+test al,2
+jnz l00
+mov al,2
+out 60h,al
+l12:
+in al,64h
+test al,2
+jnz l12
+mov al,60h
+out 64h,al
+l9:
+in al,64h
+test al,2
+jnz l9
+mov al,47h
+out 60h,al
+l10:
+in al,64h
+test al,2
+jnz l10
+mov al,0aeh
+out 64h,al
+
+
+mov ax,2000h
+mov es,ax
+mov di,0
+mov ax,600h
+stosw
+
+mov al,0
+out 21h,al
+out 0a1h,al
+quit:
+ll:in al,60h
+cmp al,1
+jnz ll
+mov ah,4ch
+int 21h
+
+
+
+mouse proc far
+mousebegin:
+cli
+push ax
+push bx
+push cx
+push dx
+push si
+push di
+push bp
+push ds
+push es
+
+mov ax,0b800h
+mov es,ax
+mov ax,2000h
+mov ds,ax
+mov si,0
+lodsw
+mov bp,ax
+
+mov ax,0
+mov bx,0
+mov cx,0
+mov dx,0
+l0:
+in al,64h
+test al,1
+jz l0
+in al,60h
+mov ah,al
+l1:
+in al,64h
+test al,1
+jz l1
+in al,60h
+mov bl,al
+l2:
+in al,64h
+test al,1
+jz l2
+in al,60h
+mov cl,al
+in al,60h
+mov dl,al
+
+push ax
+mov al,160
+mul cl
+mov cx,ax
+pop ax
+
+
+test ah,10h
+jz right
+test ah,20h
+jz leftdown
+sub bp,bx
+sub bp,cx
+jmp l4
+leftdown:
+sub bp,bx
+add bp,cx
+jmp l4
+right:
+test ah,20h
+jz rightdown
+add bp,bx
+sub bp,cx
+jmp l4
+rightdown:
+add bp,bx
+add bp,cx
+
+l4:
+mov ax,4142h
+mov di,bp
+stosw
+mov si,0
+mov ds:[si],bp
+
+mov al,20h
+out 0a0h,al
+out 20h,al
+pop es
+pop ds
+pop bp
+pop di
+pop si
+pop dx
+pop cx
+pop bx
+pop ax
+sti
+iret
+mouselenth=$-mousebegin
+mouse endp
+code ends
+end start

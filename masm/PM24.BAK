@@ -1,0 +1,261 @@
+
+.386p
+gdtseg segment para use16
+gdt0 dq 0
+gdt1  dq 000098000000ffffh ;initiate pm16
+gdt2  dq 004098000000ffffh
+gdt3  dq 004098000000ffffh
+gdt4  dq 004098000000ffffh
+
+gdt5 dq 0040920a0000ffffh
+
+gdt6 dq 0040920000000fffh  ;stack0
+gdt7 dq 0040b20000000fffh  ;dpl=1
+gdt8 dq 0040d20000000fffh  ;stack2 dpl=2
+gdt9 dq 0040f20000000fffh  ;stack3 dpl=3
+
+gdt10 dq 0000850000600000h ;format
+
+gdt11 dq 0040890000000068h  ;tss1
+gdt12 dq 0040890000000068h  ;tss2,to code3
+gdtlen=$-gdt0
+gdtseg ends
+
+
+gdtpointer segment para use16
+gdtlimit dw gdtlen-1
+gdtbase dd 0
+gdtpointer ends
+
+tssseg1 segment PARA USE16
+ORG 0
+dd 26 dup (0)
+db 0ffh
+tssseg1 ends
+
+tssseg2 segment PARA USE16
+ORG 0
+dd 58h         ;CHAIN
+dd 400h     ;ESP0
+dd 30h     ;SS0
+dd 400h     ;ESP1
+dd 39h     ;SS1
+dd 400h   ;ESP2
+dd 42h    ;SS2
+dd 0          ;CR3
+dd 0          ;EIP
+DD 0         ;EFLAGES
+DD 0          ;EAX
+DD 0          ;ECX
+DD 0          ;EDX
+DD 0          ;EBX
+DD 0400H      ;ESP
+DD 0          ;EBP
+DD 0          ;ESI
+DD 0          ;EDI
+DD 28H        ;ES
+dd 18H        ;CS
+dd 30H        ;SS
+DD 28H        ;DS
+DD 28H        ;FS
+DD 28H        ;GS
+DD 0          ;LDT
+dw 0          ;BIT T,this bit can't  be 1!!!!!!!or not work!!!
+dw $+2        ;IO MAP ADDRESS
+db 0ffh       ;i/o MAP ENDS
+tssseg2 ends
+
+stack0 segment para use16
+db 1000h dup (0)
+stack0 ends
+stack1 segment para use16
+db 1000h dup (0)
+stack1 ends
+stack2 segment para use16
+db 1000h dup (0)
+stack2 ends
+stack3 segment para use16
+db 1000h dup (0)
+stack3 ends
+
+code1 segment para use16
+assume cs:code1
+mov ax,58h
+ltr ax
+DB 09AH
+DW 0
+DW 10H
+
+TOREAL:
+CLTS
+MOV AX,28H
+MOV DS,AX
+MOV ES,AX
+MOV FS,AX
+MOV GS,AX
+MOV SS,AX
+MOV EAX,CR0
+AND AL,0FEH
+MOV CR0,EAX
+JMP FAR PTR REAL
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+MOV AX,30H
+MOV SS,AX
+MOV AX,28H
+MOV DS,AX
+MOV ES,AX
+MOV FS,AX
+MOV GS,AX
+mov Ecx,0FFFFH
+mov di,0
+MOV AL,3
+REP STOSB
+LLL0:IN AL,60H
+CMP AL,39H
+JNZ LLL0
+
+
+DB 09AH
+DW 0
+dw 0     ;32bit taskgate
+DW 60H
+
+
+ll000:
+in al,60h
+cmp al,1
+jnz ll000
+db 0eah           ;THE MOST IMPORTANT CODE!! 0eah=JMP HERE,NOT 09AH=CALL!!!!!!
+dw offset toreal
+dw 0
+dw 8
+code2 ends
+
+code3 segment para use32
+assume cs:code3
+mov edi,0
+MOV AL,4
+MOV ECX,0FFFFH
+REP STOSB
+L0:
+IN AL,60H
+CMP AL,1CH
+JNZ L0
+
+iret
+
+code3 ends
+
+code4 segment para use32
+assume cs:code4
+code4 ends
+
+code0 segment para use16
+assume SS:STACK0,cs:code0,ds:gdtseg,es:gdtpointer
+start:
+MOV AX,STACK0
+MOV SS,AX
+mov ax,gdtpointer
+mov es,ax
+xor eax,eax
+mov ax,gdtseg
+mov ds,ax
+shl eax,4
+xor ebx,ebx
+mov bx,offset gdt0
+add eax,ebx
+mov dword ptr es:[gdtbase],eax
+
+xor eax,eax
+mov ax,code1
+shl eax,4
+mov word ptr ds:[gdt1+2],ax
+shr eax,16
+mov byte ptr ds:[gdt1+4],al
+
+xor eax,eax
+mov ax,code2
+shl eax,4
+mov word ptr ds:[gdt2+2],ax
+shr eax,16
+mov byte ptr ds:[gdt2+4],al
+
+xor eax,eax
+mov ax,code3
+shl eax,4
+mov word ptr ds:[gdt3+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT3+4],AL
+
+XOR EAX,EAX
+MOV AX,CODE4
+SHL EAX,4
+MOV WORD PTR DS:[GDT4+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT4+4],AL
+
+
+XOR EAX,EAX
+MOV AX,STACK0
+SHL EAX,4
+MOV WORD PTR DS:[GDT6+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT6+4],AL
+XOR EAX,EAX
+MOV AX,STACK1
+SHL EAX,4
+MOV WORD PTR DS:[GDT7+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT7+4],AL
+XOR EAX,EAX
+MOV AX,STACK2
+SHL EAX,4
+MOV WORD PTR DS:[GDT8+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT8+4],AL
+XOR EAX,EAX
+MOV AX,STACK3
+SHL EAX,4
+MOV WORD PTR DS:[GDT9+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT9+4],AL
+
+xor eax,eax
+mov ax,tssseg1
+shl eax,4
+mov word ptr ds:[gdt11+2],ax
+shr eax,16
+mov BYTE ptr ds:[gdt11+4],al
+
+XOR EAX,EAX
+MOV AX,TSSSEG2
+SHL EAX,4
+MOV WORD PTR DS:[GDT12+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT12+4],AL
+
+MOV AX,13H
+INT 10H
+MOV AL,2
+OUT 92H,AL
+CLI
+LGDT QWORD PTR ES:[GDTLIMIT]
+MOV EAX,CR0
+OR AL,1
+MOV CR0,EAX
+DB 09AH
+DW 0
+DW 8
+
+REAL:
+MOV AX,STACK0
+MOV SS,AX
+MOV AX,3
+INT 10H
+MOV AH,4CH
+INT 21H
+CODE0 ENDS
+END START

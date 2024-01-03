@@ -1,0 +1,77 @@
+.386   ;why 386 instruction could exexcte the pentium instructions?
+
+data SEGMENT PARA USE16
+str0 db "cpuid is:"
+cpu db 16 dup (20h)
+db 24h
+DATA ENDS
+
+code SEGMENT PARA USE16
+ASSUME CS:CODE
+start:
+mov ax,3
+int 10h
+mov ax,data
+mov ds,ax
+mov eax,0
+                         
+dw 0a20fh        ; CPUID IS NOT RIGHT ; machine word of cpuid
+;mov dword ptr ds:[cpu],eax
+mov dword ptr ds:[cpu+4],ebx
+mov dword ptr ds:[cpu+8],edx
+mov dword ptr ds:[cpu+12],ecx
+
+mov ax,0b800h
+mov es,ax
+
+mov dx,3d4h
+mov al,0ch
+out dx,al
+mov dx,3d5h
+mov al,0
+out dx,al
+mov dx,3d4h
+mov al,0dh
+out dx,al
+mov dx,3d5h
+mov al,0a0h
+out dx,al
+
+mov dx,3d4h
+mov ax,0eh
+out dx,ax
+mov dx,3d4h
+mov ax,0f80fh
+out dx,ax
+
+cld
+mov ah,0ch           ;watch the attribute,to commplish blink and enhanced color
+mov di,1600
+mov si,offset str0
+l0:
+lodsb
+cmp al,24h
+jz outloop
+stosw
+jmp l0
+
+outloop:
+mov ah,0
+int 16h
+mov ah,4ch
+int 21h
+CODE ENDS
+end start
+
+mov dx,3d4h
+mov al,0eh
+out dx,al
+mov dx,3d5h
+mov al,0
+out dx,al
+mov dx,3d4h
+mov al,0fh
+out dx,al
+mov dx,3d5h
+mov al,160
+out dx,al

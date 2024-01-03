@@ -1,0 +1,160 @@
+;本方法的不足之处在于显示的图象左右相反
+;本方法的优点在于简便   起思想在于把所有图象数据反向排列
+;
+data segment
+str0 db 'e:\asm\16.bmp',0      ;文件名
+data ends
+
+stack segment stack
+db 2000h dup (0)
+stack ends
+
+code segment para 
+assume cs:code
+start:
+cli
+
+mov ax,data
+mov ds,ax
+
+
+mov ax,3d02h
+mov dx,offset str0
+int 21h
+push ax
+
+next:
+MOV AX,4F02H
+MOV BX,112H        ;显示模式
+INT 10H
+MOV AX,4F06H
+MOV BX,0
+MOV CX,480          ;扫描行长度
+INT 10H
+
+
+
+MOV BP,1
+mov ax,0a000h
+mov es,ax
+mov ax,2000h
+mov ds,ax
+
+pop bx
+mov ax,4202h
+mov cx,0
+mov dx,0
+int 21h
+
+mov cx,dx
+mov dx,ax
+
+NEXTPAGE:
+dec Cx
+cmp cx,0ffffh
+jnz showfullseg
+call showdetail
+
+showfullseg:
+push dx
+push Cx
+PUSH BX
+mov ax,4200h
+int 21h
+ 
+mov ah,3fh
+mov cx,0ffffh
+mov dx,0
+int 21h
+
+mov cx,0ffffh
+mov si,0ffffh
+mov  di,0
+L0:
+mov al,ds:[si]
+mov es:[DI],AL
+DEC SI
+INC DI
+LOOP L0
+
+MOV AX,4F05H
+MOV BX,0
+MOV DX,BP
+INT 10H
+INC BP
+POP BX
+POP CX
+POP DX
+Jmp NEXTPAGE
+
+
+showdetail proc near
+push dx
+mov ax,4200h
+mov cx,0
+mov dx,0
+int 21h
+pop cx
+
+mov ah,3fh
+mov dx,0
+int 21h
+dec cx
+mov si,cx
+inc cx
+sub cx,36h             ;为什么要减去54？BMP文件头信息块大小为36H
+
+mov  di,0
+L1:
+mov al,ds:[si]
+mov es:[DI],AL
+DEC SI
+INC DI
+LOOP L1
+showdetail endp
+
+sti
+mov ax,36h
+out 43h,al
+mov ax,20000
+out 40h,al
+mov al,ah
+out 40h,al
+mov ax,40h
+mov es,ax
+mov si,6ch
+mov bp,1
+l5:
+in al,60h
+cmp al,1
+jz quit
+mov ax,es:[si]
+inc ax
+l6:
+mov bx,es:[si]
+cmp ax,bx
+ja l6
+mov ax,4f07h
+mov bx,0
+mov cx,bp
+mov dx,0
+int 10h
+inc bp
+cmp bp,1024h
+jnz l5
+mov ah,0
+int 16h
+
+
+QUIT:
+MOV AH,0
+INT 16H
+mov ax,4f02h
+mov bx,3
+int 10h
+;mov sp,500h
+;ret                                                   ;这里用RET 对应PUSH 0；实际上回到CS：0；所以会重复执行本程序，但为什么
+mov ah,4ch
+int 21h                                                       ;retf 指令会错误呢？？
+CODE ENDS          
+END START

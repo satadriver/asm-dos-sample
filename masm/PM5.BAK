@@ -1,0 +1,249 @@
+.386p
+code1 segment para use16
+assume cs:code1
+begin4:
+mov ax,20h
+ltr ax
+db 09ah
+dw offset begin1
+dw 48h
+code1len=$-begin4
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+begin3:mOV AX,18H
+MOV DS,AX
+MOV ES,AX
+MOV FS,AX
+MOV GS,AX
+MOV eSI,0
+MOV eCX,0FFFFH
+MOV AL,2;;;;
+L0:
+MOV [eSI],AL
+INC eSi            ;;;;;;;
+LOOP L0
+MOV CX,0FFFFH
+L1:MOV AX,0FFFFH
+L2:DEC AX
+CMP AX,0
+JNZ L2
+DEC CX
+CMP CX,0
+JNZ L1                ;;;;
+db 09ah
+dw offset begin2
+dw 0
+dw 50h
+code2len=$-begin3
+CODE2 ENDS
+
+
+
+code3 segment para use32
+assume cs:code3
+begin1:
+xor eax,eax
+mov ax,28h
+mov ss,ax
+mov ax,1000h
+mov esp,eax
+mov ax,43h;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+push eax
+mov ax,1000h
+push eax
+mov ax,20h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+xor eax,eax
+mov ax,13h;;;;;;;;;;;;;;;;;;;;;;;
+push  eax
+mov ax,offset begin3
+push eax
+retf
+code3len=$-begin1
+
+;db 09ah ;;;;;
+;dw 0         ;;;;;
+;dw 0              ;;;;;
+;dw 10h
+       ;;;;;
+code3 ends
+
+
+code4 segment para use16
+assume cs:code4
+begin2:
+mov eax,cr0
+and eax,0fffffffeh
+mov cr0,eax
+db 0eah
+dw offset rm16
+dw seg rm16
+rm16:mov al,0
+out 92h,al
+mov ax,3
+int 10h
+mov ah,4ch
+int 21h
+code4len=$-begin2
+code4 ends
+
+gdtseg segment para use16
+gdtlen dw gdtend-1
+gdtbase dd 0
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 0040f8000000ffffh;;;;;;;;;;;;;;;;;;;
+gdt3 dq 0040f20a0000ffffh;;;;;;;;;;;;;;;;;;;;;;
+gdt4 dq 0000890000000068h
+gdt5 dq 0040920000000fffh
+gdt6 dq 0040b20000000fffh
+gdt7 dq 0040d20000000fffh
+gdt8 dq 0040f20000000fffh
+gdt9 dq 004098000000ffffh
+gdt10 dq 000098000000ffffh
+gdtend=$-gdt0
+gdtseg ends
+
+tssseg segment PARA USE16
+DD 0
+DD 1000H
+DD 28H
+DD 1000H
+DD 31H;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+DD 1000H
+DD 3aH;;;;;;;;;;;;;;;;;;;;
+DD 18 DUP (0)
+DW 0
+DW $+2
+DB 0FFH
+TSSSEG ENDS
+
+stack0 segment para use16
+db 1000h dup (0)
+stack0 ends
+stack1 segment para use16
+db 1000h dup (0)
+stack1 ends
+stack2 segment para use16
+db 1000h dup (0)
+stack2 ends
+stack3 segment para use16
+db 1000h dup (0)
+stack3 ends
+
+code0 segment para use16
+assume cs:code0
+START:
+XOR EAX,EAX
+MOV AX,GDTSEG
+MOV DS,AX
+SHL EAX,4
+XOR ESI,ESI
+MOV SI,OFFSET GDT0
+ADD EAX,ESI
+MOV DWORD PTR DS:[GDTBASE],EAX
+
+XOR EAX,EAX
+MOV AX,code1
+SHL EAX,4
+MOV WORD PTR DS:[GDT1+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT1+4],AL
+MOV BYTE PTR DS:[GDT1+7],AH
+
+
+XOR EAX,EAX
+MOV AX,code3
+SHL EAX,4
+MOV WORD PTR DS:[GDT9+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT9+4],AL
+MOV BYTE PTR DS:[GDT9+7],AH
+
+XOR EAX,EAX
+MOV AX,CODE2
+SHL EAX,4
+MOV WORD PTR DS:[GDT2+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT2+4],AL
+MOV BYTE PTR DS:[GDT2+7],AH
+
+XOR EAX,EAX
+MOV AX,TSSSEG
+SHL EAX,4
+MOV WORD PTR DS:[GDT4+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT4+4],AL
+MOV BYTE PTR DS:[GDT4+7],AH
+
+XOR EAX,EAX
+MOV AX,STACK0
+SHL EAX,4
+MOV WORD PTR DS:[GDT5+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT5+4],AL
+MOV BYTE PTR DS:[GDT5+7],AH
+
+XOR EAX,EAX
+MOV AX,STACK1
+SHL EAX,4
+MOV WORD PTR DS:[GDT6+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT6+4],AL
+MOV BYTE PTR DS:[GDT6+7],AH
+
+XOR EAX,EAX
+MOV AX,STACK2
+SHL EAX,4
+MOV WORD PTR DS:[GDT7+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT7+4],AL
+MOV BYTE PTR DS:[GDT7+7],AH
+
+XOR EAX,EAX
+MOV AX,STACK3
+SHL EAX,4
+MOV WORD PTR DS:[GDT8+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT8+4],AL
+MOV BYTE PTR DS:[GDT8+7],AH
+
+xor eax,eax
+mov ax,code4
+shl eax,4
+mov word ptr ds:[gdt10+2],ax
+shr eax,16
+mov byte ptr ds:[gdt10+4],al
+mov byte ptr ds:[gdt10+7],ah
+
+mov ax,code1len-1
+mov word ptr ds:[gdt1],ax
+mov ax,code2len-1
+mov word ptr ds:[gdt2],ax
+
+mov ax,code3len-1
+mov word ptr ds:[gdt9],ax
+mov ax,code4len-1
+mov word ptr ds:[gdt10],ax
+
+mov ax,13h
+int 10h
+
+LGDT QWORD PTR DS:[GDTLEN]
+CLI
+MOV AL,2
+OUT 92H,AL
+MOV EAX,CR0
+OR EAX,1
+MOV CR0,EAX
+DB 09AH
+dw 0
+DW 8
+
+CODE0 ENDS
+END START

@@ -1,0 +1,333 @@
+.686p
+code1 segment para use16
+assume cs:code1
+MOV AL,36H
+OUT 43H,AL
+MOV AX,1FFFH
+OUT 40H,AL
+MOV AL,AH
+OUT 40H,AL
+db 0eah
+dw 0
+dw 10h
+
+toreal:
+mov ax,38h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov eax,cr0
+and al,0feh
+mov cr0,eax
+db 0eah
+dw offset rm16
+dw seg rm16
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+;mov eax,cr4
+;or al,2
+;mov cr4,eax
+
+
+
+mov ax,30h
+mov ss,ax
+mov ax,800h
+mov sp,ax
+mov ax,28h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+
+mov al,0feh
+out 0a1h,al
+
+mov al,0feh
+out 21h,al
+mov al,0feh
+out 0a1h,al
+
+mov esi,0
+
+mov al,66
+mov [esi],al
+inc esi
+mov al,41h
+mov [esi],al
+INC ESI
+mov al,69
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+INC ESI
+MOV AL,71
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+INC ESI
+MOV AL,73
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+INC ESI
+MOV AL,78
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+MOV ESI,0
+
+mov ax,0ffffh
+l1:mov cx,0fffh
+l2:dec cx
+cmp cx,0
+jnz l2
+dec ax
+cmp ax,0
+jnz l1
+MOV ESI,0
+mov edi,100h
+sti
+l0:
+NOP
+NOP
+NOP
+jmp l0
+CODE2 ENDS
+
+CODE3 SEGMENT PARA USE32
+ASSUME CS:CODE3
+INC ESI
+;MOV AX,28H            ;no need
+;MOV DS,AX          
+;MOV ES,AX       
+;MOV FS,AX    
+;MOV GS,AX 
+XOR EDX,EDX
+XOR EAX,EAX
+MOV EAX,ESI
+MOV EBX,18
+DIV EBX
+CMP EDX,0
+JNZ NEXT0
+PUSH EAX
+CMP AL,9
+Jbe NEXT1
+ADD AL,7H
+NEXT1:
+add al,30h
+mov [di],al
+inc di
+mov cl,42h
+mov [di],cl
+inc di
+pop eax
+cmp al,10h
+jz next2
+NEXT0:mov al,20h                     ;why must be needed this command??????????
+out 20h,al       
+out 0a0h,al
+
+iretD                                                  ; only correct instruction here  
+next2:cli
+mov al,20h
+out 20h,al
+out 0a0h,al
+mov al,0
+out 21h,al                                       ;;;;;;
+db 0eah
+dw offset toreal         ;;;;;;;;;;;;;;;;;;
+dw 0
+dw 8
+code3 ends
+
+code4 segment para use32
+assume cs:code4
+;L9:         
+;NOP
+;NOP
+;NOP
+;JMP L9
+IRETD                   ;;;;;;;;;;;;;;;;;;;;;;;;
+code4 ends
+
+gdtseg segment use16
+spptr dw 0
+ssptr dw 0
+gdtlen dw gdtend-1
+gdtbase dd 0
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 004098000000ffffh
+gdt3 dq 004098000000ffffh
+gdt4 dq 004098000000ffffh
+gdt5 dq 0040920b8000ffffh
+gdt6 dq 0040920000000fffh
+gdt7 dq 000092000000ffffh
+gdtend=$-gdt0
+gdtseg ends
+
+idtseg segment para use16
+DOSIDT DW 0
+DD 0
+;DW 0
+idtlen dw idtend-1
+idtbase dd 0
+idtbegin=$
+
+rept 8
+dq 00008f0000200000h
+endm
+
+dq 00008e0000180000h
+
+rept 247
+dq 00008f0000200000h
+endm
+idtend=$-idtbegin
+idtseg ends
+
+stack0 segment para use32
+db 1000h dup (0)
+stack0 ends
+
+code0 segment para use16
+assume cs:code0,ds:gdtseg,es:idtseg
+start:
+XOR EAX,EAX
+MOV AX,GDTSEG
+MOV DS,AX
+SHL EAX,4
+XOR ESI,ESI
+MOV SI,OFFSET GDT0
+ADD EAX,ESI
+MOV DWORD PTR DS:[GDTBASE],EAX
+
+XOR EAX,EAX
+MOV AX,CODE1
+SHL EAX,4
+MOV WORD PTR DS:[GDT1+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT1+4],AL
+
+
+XOR EAX,EAX
+MOV AX,CODE2
+SHL EAX,4
+MOV WORD PTR DS:[GDT2+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT2+4],AL
+
+XOR EAX,EAX
+MOV AX,CODE3
+SHL EAX,4
+MOV WORD PTR DS:[GDT3+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT3+4],AL
+
+XOR EAX,EAX
+MOV AX,CODE4
+SHL EAX,4
+MOV WORD PTR DS:[GDT4+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT4+4],AL
+
+XOR EAX,EAX
+MOV AX,STACK0
+SHL EAX,4
+MOV WORD PTR DS:[GDT6+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT6+4],AL
+
+MOV AX,SP
+MOV word ptr DS:[SPPTR],AX
+MOV AX,SS
+MOV  word ptr DS:[SSPTR],AX
+
+XOR EAX,EAX
+MOV AX,IDTSEG
+MOV ES,AX
+SHL EAX,4
+XOR ESI,ESI
+MOV SI,OFFSET IDTBEGIN
+ADD EAX,ESI
+MOV DWORD PTR ES:[IDTBASE],Eax
+
+SIDT QWORD PTR ES:[DOSIDT]
+lgdt qword ptr ds:[gdtlen]
+cli
+lidt qword ptr es:[idtlen]
+
+mov al,2
+out 92h,al
+mov eax,cr0
+or eax,1
+mov cr0,eax
+
+mov eax,cr4
+or al,2
+mov cr4,eax
+
+db 0eah
+dw 0
+dw 8
+
+rm16:
+;cli                      ;;;;;;;;;;;;;;;;;;;
+MOV AX,IDTSEG
+MOV ES,AX
+LIDT QWORD PTR ES:[DOSIDT]
+mov ax,gdtseg
+mov ds,ax
+lss sp,dword ptr ds:[spptr]
+sti
+mov ah,4ch
+int 21h
+code0 ends
+end start
+
+
+
+code5 segment para use32
+assume cs:code5
+mov di,100h
+NEXT:
+mov ax,28h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+MOV AX,SI
+MOV bl,36
+DIV bl
+CMP ah,0
+JNZ NEXT
+PUSH eax
+CMP AL,9
+Jbe NEXT1
+ADD AL,7H
+NEXT1:
+add al,30h
+mov [di],al
+inc di
+mov cl,42h
+mov [di],cl
+pop eax
+cmp al,10h
+jz next2
+iret
+next2:
+db 0eah
+dw offset toreal
+dw 0
+dw 8
+code5 ends
+

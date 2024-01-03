@@ -1,0 +1,20 @@
+#include <resource.h>
+
+#define DLG_MAIN 	0X1000
+#define LTXT_INPUT 	0X1010
+#define LTXT_SHOW 	0X1011
+#define BTN_FIND 	0X1020
+#define BTN_QUIT 	0x1021
+#define TXT_SHOW	0x1030
+
+DLG_MAIN dialog 100,100,200,100
+STYLE DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU 
+CAPTION "本程序测试在PE文件中插入新代码!"
+FONT 9,"楷体"
+{
+ltext "本程序将在您的可执行文件中添加无害代码，请单击查找按钮选择您要添加代码的EXE文件.",LTXT_INPUT,10,10,180,20
+ltext "您选择的文件是:",LTXT_SHOW,10,40,40,20
+EDITTEXT TXT_SHOW,50,40,140,20
+defpushbutton "查找",BTN_FIND,40,70,30,20
+defpushbutton "退出",BTN_QUIT,130,70,30,20
+}

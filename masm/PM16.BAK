@@ -1,0 +1,184 @@
+.386p
+code1 segment para use16
+assume cs:code1
+mov ax,18h
+mov ds,ax
+mov si,0
+mov cx,07ffh
+mov ax,6020h     ;why not mov ax,2060h here!!!6020=all yellow
+ll0:mov ds:[si],ax
+add si,2
+loop ll0
+
+mov ax,28h  ;PDE LIMIT LOW ADDRESS IS 1MB,NOT 16MB;REAL MACHINE ADDRESS
+;NOT SEGMENT:OFFSET MODE,LIKE TO GDT BASE IN LGDT INSTRUCTION
+mov es,ax
+mov di,0
+mov cx,1024 ;PDE MUST BE INITIAED TO BE 0
+xor eax,eax
+cld
+rep stosd
+
+mov di,0
+mov eax,101003h ;BASE ADDRESS 101000H=1MB+4KB
+mov es:[di],eax
+add di,4
+add eax,1000h
+mov es:[di],eax
+
+mov ax,30h
+mov es,ax
+mov di,0
+mov eax,3
+mov cx,1023
+l0:stosd
+add eax,1000h
+loop l0
+
+;mov di,8
+;mov eax,20003h   ;WATCH OUT!DONT IGNORE THE D0=PRESENT,D1=R/W,AND D2=U/S
+;mov dword ptr es:[di],eax
+
+mov ax,38h
+mov es,ax
+mov di,0
+mov cx,1023
+mov eax,400003h   ;WATCH OUT THE PRIVILEGE BIT=3!
+l1:stosd
+add eax,1000h
+loop l1
+
+mov di,4
+mov eax,0b8003h   ;WATCH OUT THE PRIVILEGE BIT
+mov es:[di],eax
+
+mov eax,100000h
+mov cr3,eax
+mov eax,cr0
+or eax,80000000h
+mov cr0,eax
+db 0eah
+dw 0
+dw 10h
+
+TOreal:
+mov ax,20h
+mov ds,ax
+mov es,ax
+mov ss,ax
+mov fs,ax
+mov gs,ax
+mov eax,cr0
+and al,0feh
+mov cr0,eax
+db 0eah
+dw offset rm16
+dw seg rm16
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+jmp l3
+str0 db "now page is working!$"
+l3:
+mov ax,40h
+mov es,ax
+mov ax,10h
+mov ds,ax
+mov di,0
+mov si,offset   str0
+mov ah,42h    ;AH HERE IS A INSPIRING INOVATION
+cld
+l2:
+lodsb    ;WATCH OUT INSTRUCTIONS LODS AND STOS
+CMP AL,24H
+JZ JUMPOUT
+stosw
+JMP L2
+JUMPOUT:
+mov cx,0fffh
+l4:mov AX,0ffffh
+l5:dec ax
+cmp ax,0
+jnz l5
+dec cx
+cmp cx,0
+jnz l4
+
+;mov eax,cr0
+;and eax,7fffffffh
+;mov cr0,eax
+
+db 0eah
+dw offset TOreal
+dw 0
+dw 8
+code2 ends
+
+gdtseg segment para use16
+gdtlen dw gdtend-1
+gdtbase dd 0
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 00409a000000ffffh
+gdt3 dq 0000920b8000ffffh
+gdt4 dq 000092000000ffffh
+gdt5 dq 0000921000000fffh
+gdt6 dq 0000921010000fffh
+gdt7 dq 0000921020000fffh
+gdt8 dq 000092401000ffffh
+gdtend=$-gdt0
+gdtseg ends
+
+code0 segment para use16
+assume cs:code0
+start:
+xor eax,eax
+mov ax,gdtseg
+mov ds,ax
+shl eax,4
+xor esi,esi
+mov si,offset gdt0
+add eax,esi
+mov dword ptr ds:[gdtbase],eax
+
+xor eax,eax
+mov ax,code1
+shl eax,4
+mov word ptr ds:[gdt1+2],aX
+shr eax,16
+mov byte ptr ds:[gdt1+4],al
+
+xor eax,eax
+mov ax,code2
+shl eax,4
+mov word ptr ds:[gdt2+2],ax
+shr eax,16
+mov byte ptr ds:[gdt2+4],al
+
+cli
+lgdt qword ptr ds:[gdtlen]
+
+mov al,2
+out 92h,al
+mov eax,cr0
+or eax,1
+mov cr0,eax
+db 0eah
+dw 0
+dw 8
+
+rm16:
+mov al,0
+out 21h,al
+out 0a1h,al
+sti
+mov al,0
+out 92h,al
+mov ah,4ch
+int 21h
+code0 ends
+end start
+
+
+

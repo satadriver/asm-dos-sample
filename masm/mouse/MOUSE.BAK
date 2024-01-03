@@ -1,0 +1,273 @@
+.model small
+.386
+.stack
+.code
+mouse proc far
+PUSHA
+PUSH DS
+PUSH ES
+
+CLD
+MOV AX,2000H
+MOV DS,AX
+XOR AX,AX
+MOV SI,0
+LODSB
+CMP AL,3
+JZ TOZERO
+INC AL
+DEC SI
+MOV DS:[SI],AL
+MOV SI,AX
+L15:
+IN AL,64H
+TEST AL,1
+JZ L15
+IN AL,60H
+MOV DS:[SI],AL
+JMP RETURN
+
+TOZERO:
+MOV AL,0
+DEC SI
+MOV DS:[SI],AL
+MOV SI,3
+L16:
+IN AL,64H
+TEST AL,1
+JZ L16
+IN AL,60H
+MOV DS:[SI],AL
+
+XOR AX,AX
+MOV BX,AX
+MOV CX,AX
+MOV DX,AX
+
+MOV SI,1
+LODSB
+MOV BL,AL
+LODSB
+MOV CL,AL
+LODSB
+MOV DL,AL
+lODSB
+MOV BH,AL
+
+
+MOV Ax,320     ;320x200 13h
+MUL Dx
+MOV DX,AX
+
+MOV AX,0a000H  ;garphics mode
+MOV ES,AX
+MOV SI,5
+LODSW
+MOV DI,AX
+
+MOV AX,4
+
+test bl,10h
+jnz left
+test bl,20h
+jnz rightdown
+
+rightup:
+add DI,CX
+sub DI,dx
+STOSB
+DEC DI
+MOV SI,5
+MOV DS:[SI],DI
+jmp return
+
+rightdown:
+add DI,cx
+add DI,dx
+STOSB
+DEC DI
+MOV SI,5
+MOV DS:[SI],DI
+jmp return
+
+left:
+test bl,20h
+jz leftup
+
+sub DI,cx
+add DI,dx
+STOSB
+DEC DI
+MOV SI,5
+MOV DS:[SI],DI
+jmp return
+
+leftup:
+sub DI,cx
+sub DI,dx
+STOSB
+DEC DI
+MOV SI,5
+MOV DS:[SI],DI
+
+RETURN:
+MOV AL,20H
+OUT 20H,AL
+out 0a0h,al
+POP ES
+POP DS
+POPA
+sti
+iret
+mouselenth=$-mouse
+mouse endp
+
+start:
+push ds
+mov ax,0
+push ax
+cli
+
+mov ax,seg mouse
+mov ds,ax
+mov ax,5000h
+mov es,ax
+mov di,0
+mov si,offset mouse
+mov cx,mouselenth
+rep movsb
+
+mov ax,0
+mov Es,ax
+mov Di,1d0h
+STOSW
+mov ax,5000h
+STOSW
+
+l0:
+in al,64h
+test al,2
+jnz l0
+mov al,0adh
+out 64h,al
+
+l1:
+in al,64h
+test al,2
+jnz l1
+
+MOV AL,0A8H
+OUT 64H,AL
+
+L2:
+IN AL,64H
+TEST AL,2
+JNZ L2
+
+MOV AL,0D4H
+OUT 64H,AL
+
+L3:IN AL,64H
+TEST AL,2
+JNZ L3
+
+L4:
+MOV AL,0F4H
+OUT 60H,AL
+
+L5:IN AL,64H
+TEST AL,1
+JZ L5
+IN AL,60H
+CMP AL,0FAH
+JNZ L5
+
+
+MOV AL,0D4H
+OUT 64H,AL
+L6:
+IN AL,64H
+TEST al,2
+jnz l6
+
+L7:
+MOV AL,0F3H
+OUT 60H,al
+l8:in al,64h
+test AL,1
+JZ L8
+
+IN AL,60H
+CMP AL,0FAH
+JNZ L7
+
+l9:in al,64h
+test al,2
+JNZ L9
+
+L17:
+MOV AL,0FFH
+OUT 60H,AL
+L10:
+IN AL,64H
+TEST AL,1
+JZ L10
+IN AL,60H
+CMP AL,0FAH
+JNZ L17
+
+L11:
+IN AL,64H
+TEST AL,2
+JNZ L11
+
+MOV AL,60H
+OUT 64H,AL
+
+L12:IN AL,64H
+TEST AL,2
+JNZ L12
+
+MOV AL,47H
+OUT 60H,AL
+
+L13:
+in al,64h
+test al,2
+jnz L13
+mov al,0aeh
+out 64h,al
+
+MOV AX,2000H
+MOV ES,AX
+MOV DI,0
+MOV AX,0
+STOSB
+MOV AX,7500H
+MOV DI,5
+STOSW
+
+mov AX,13H
+INT 10H
+MOV AX,0A000H
+MOV ES,AX
+MOV DI,0
+MOV AL,0FFH
+MOV CX,0FFFFH
+REP STOSB
+mov al,0
+out 21h,al
+out 0a1h,al
+
+sti
+L20:IN AL,64H
+test al,1
+jz l20
+in al,60h
+cmp al,1
+jnz l20
+MOV AX,3
+INT 10H
+RETF
+END START
+

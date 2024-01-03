@@ -1,0 +1,136 @@
+
+descriptor struc
+limitlow dw 0
+baselow dw 0
+basemedium db 0
+limit4highbit_attribute dw 0
+basehigh db 0
+descriptor ends
+
+.386p
+gdtseg segment para use16
+gdtlen dw gdtend-1
+gdtbase dd 0
+gdt0 descriptor  <>
+gdt1 descriptor  <0ffffh,code1,0,4f9ah,0>;;;;;
+code1sel=$-gdt0
+gdt2 descriptor  <0ffffh,0a000h,0,92h,0>
+data1sel=$-gdt0      ;;;
+gdt3 descriptor <0ffffh,code2,0,98h,0>
+code2sel=$-gdt0
+gdtend=$-gdt0
+gdtnum=gdtend/8
+gdtseg ends
+
+code2 segment para use16
+assume cs:code2
+mov ax,data1sel
+mov es,ax
+mov ds,ax
+mov si,0
+mov cx,0ffffh
+mov al,2
+l100:
+mov [si],al
+inc si
+loop l100
+mov ax,0ffffh
+l111:
+mov cx,0ffffh
+l222:dec cx
+cmp cx,0
+jnz l222
+dec ax
+cmp ax,0
+jnz l111
+
+db 0eah
+dw 0
+dw offset virtual
+dw 10h
+code2 ends
+
+code1 segment para use32
+assume cs:code1
+virtual:
+mov ax,data1sel
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov esi,0
+mov al,4
+mov ecx,0ffffh
+l0:
+mov [esi],al
+inc esi
+loop l0
+mov ax,0ffffh
+l1:
+mov cx,0ffffh
+l2:
+DEC CX
+CMP CX,0
+JNZ L2
+DEC AX
+CMP AX,0
+JNZ L1
+MOV EAX,CR0
+AND AL,0FEH
+MOV CR0,EAX
+DB 0EAH
+DW OFFSET REAL
+DW SEG REAL
+CODE1 ENDS
+
+
+code0 segment para use16
+assume cs:code0
+start:
+xor eax,eax
+mov ax,gdtseg
+mov ds,ax
+shl eax,4
+xor esi,esi
+mov si,offset gdt0
+add eax,esi
+mov dword ptr ds:[gdtbase],eax
+
+cld
+mov si,offset gdt0
+mov cx,gdtnum
+initgdtbase:
+xor eax,eax
+mov ax,ds:[si].baselow
+shl eax,4
+mov word ptr ds:[si].baselow,ax
+shr eax,16
+mov byte ptr ds:[si].basemedium,al
+add si,8
+loop initgdtbase
+
+MOV AX,4F02H
+MOV BX,13H
+INT 10H
+lgdt qword ptr ds:[gdtlen]
+cli
+mov al,2
+out 92h,al
+mov eax,cr0
+or eax,1
+mov cr0,eax
+db 0eah
+dw 0
+dw code2sel
+
+REAL:
+MOV AL,0
+OUT 92H,AL
+MOV AX,4F02H
+MOV BX,3
+INT 10H
+MOV AH,4CH
+INT 21H
+code0 ends
+end start

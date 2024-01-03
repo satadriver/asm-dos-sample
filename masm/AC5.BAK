@@ -1,0 +1,400 @@
+.386p
+pmstack segment para use32
+dd 400h dup (0)
+pmstack ends
+
+stack segment stack
+db 400h dup (0)
+stack ends
+
+data segment para use16
+prdtable dq 128 dup (0)
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 004098000000ffffh
+gdt3 dq 000092000000ffffh  ;data selector
+gdt4 dq 00cf92060000ffffh
+gdt5 dq 000092070000ffffh
+gdt6 dq 000092080000ffffh
+gdt7 dq 000092090000ffffh
+gdt8 dq 004092000000ffffh  ;pmstack
+gdt9 dq 000092000000ffffh
+gdt10 dq 00cf92400000ffffh ;wavdata in pm mode
+gdtlen=$-gdt0
+gdtlimit dw 4fh   ;gdtlen-1
+gdtbase dd 0
+lowpage dw 0
+highpage dw 0
+filehandle dw 0
+wavbaseseg dw 6000h
+slot0 dw 9800h
+slot4321 dt 0
+slot8765 dt 0
+slotcba9 dt 0
+stackpointer dd 0
+wavblocknum dd 0
+esipos dd 0
+edipos dd 0
+prdaddr dd 0
+leftchannel dw 0
+rightchannel dw 0
+wavheader db 3ah dup (0)
+wavname db 'SHUT    WAV',0
+fileinfo db 'f:\asm\masm\fileinfo.dat',00
+volume dw 480
+diskdfdt dd 1bf7c9dh
+diskdfat dd 1bf1f7fh
+data ends
+
+code1 segment para use16
+assume cs:code1
+db 0eah
+dw 0
+dw 10h
+returndos:
+mov ax,48h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov eax,cr0
+and al,0
+mov cr0,eax
+jmp far ptr dosmode
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+call ac97
+db 0eah
+dw 0
+dw offset returndos
+dw 8
+
+ac97 proc 
+mov ax,18h
+mov es,ax
+mov ax,50h
+mov gs,ax
+mov fs,ax
+mov ax,40h
+mov ss,ax
+mov ax,20h
+mov ds,ax
+
+mov ecx,45056
+copytoslot:
+push ecx
+mov esi,es:[esipos]
+lodsw
+mov es:[leftchannel],ax
+mov es:[rightchannel],ax
+mov es:[esipos],esi
+mov edi,offset slot4321
+add edi,5
+xor eax,eax
+mov ax,es:[leftchannel]
+stosw
+mov edi,offset slot4321
+add edi,6
+xor eax,eax
+mov ax,es:[rightchannel]
+shl eax,12
+stosd
+mov esi,offset slot0
+mov edi,es:[edipos]
+mov ecx,8
+copy:
+mov eax,es:[esi]
+mov gs:[edipos],eax
+add esi,4
+add edi,4
+loop copy
+mov es:[edipos],edi
+pop cx
+dec cx
+cmp cx,0
+jz toplay
+jmp  copytoslot
+toplay:
+call codecplay
+ret
+ac97 endp
+
+codecplay proc
+mov dx,0fa2ch
+mov eax,2
+out dx,eax
+mov dx,0fa16h
+mov ax,1
+out dx,ax
+mov dx,0fa1bh
+mov al,2
+out dx,al
+mov dx,0fa10h
+mov eax,es:[prdaddr]
+out dx,eax
+mov dx,0f002h
+mov ax,es:[volume]
+out dx,ax
+mov dx,0f018h
+out dx,ax
+mov dx,0fa16h
+mov ax,0
+out dx,ax
+mov dx,0fa1bh
+mov al,1
+out dx,al
+ret
+codecplay endp
+code2 ends
+
+
+code0 segment para use16
+assume cs:code0
+start:
+main proc
+call initpmmode
+call getwavinfo
+call readfile
+mov ax,ss
+shl eax,16
+mov ax,sp
+mov di,offset stackpointer
+stosd
+cli
+mov al,2
+out 92h,al
+lgdt qword ptr es:[gdtlimit]
+mov eax,cr0
+or al,1
+mov cr0,eax
+db 0eah
+dw 0
+dw 8
+dosmode:
+mov ax,data
+mov es,ax
+mov ds,ax
+lss sp,dword ptr es:[stackpointer]
+mov ah,4ch
+int 21h
+main endp
+
+initpmmode proc near
+xor eax,eax
+mov ax,data
+mov ds,ax
+mov es,ax
+shl eax,4
+push eax
+mov word ptr es:[gdt3+2],ax
+shr eax,16
+mov byte ptr es:[gdt3+4],al
+pop eax
+xor ebx,ebx
+mov bx,offset gdt0
+add eax,ebx
+mov es:[gdtbase],eax
+
+xor eax,eax
+mov ax,pmstack
+shl eax,4
+mov word ptr es:[gdt8+2],ax
+shr eax,16
+mov byte ptr es:[gdt8+4],al
+
+xor eax,eax
+mov ax,code1
+shl eax,4
+mov word ptr es:[gdt1+2],ax
+shr eax,16
+mov byte ptr es:[gdt1+4],al
+xor eax,eax
+mov ax,code2
+shl eax,4
+mov word ptr es:[gdt2+2],ax
+shr eax,16
+mov byte ptr es:[gdt2+4],al
+
+xor eax,eax
+mov ebx,eax
+mov eax,es
+shl eax,4
+mov bx,offset prdtable
+add eax,ebx
+mov es:[prdaddr],eax
+
+cld
+mov di,offset prdtable
+mov ecx,22
+mov eax,400000h
+fillprd:
+push eax
+stosd
+cmp ecx,11
+jz fillnextprd
+mov eax,0ffffh
+stosd
+jmp next
+fillnextprd:
+mov eax,4000ffffh
+stosd
+next:
+pop eax
+add eax,65536
+loop fillprd
+mov eax,400000
+stosd
+mov eax,8000ffffh
+stosd
+ret
+initpmmode endp
+
+
+
+READFILE PROC
+mov ax,18h
+mov ds,ax
+mov eax,ds:[diskdfdt]
+mov esi,offset wavname
+
+
+mov ax,50h
+mov es,ax
+mov di,0
+
+
+readsector proc near
+
+
+mov dx,es:[baseport]
+add dx,5
+mov al,0
+out dx,al
+dec dx
+out dx,al
+dec dx
+mov eax,es:[destsector]
+rol eax,8
+out dx,al
+add dx,2
+rol eax,8
+out dx,al
+dec dx
+rol eax,8
+out dx,al
+dec dx
+rol eax,8
+out dx,al
+mov dx,es:[baseport]
+add dx,2
+mov ax,es:[sectornum]
+xchg ah,al
+out dx,al
+xchg ah,al
+out dx,al
+mov dx,es:[baseport]
+add dx,7
+mov al,29h
+out dx,al
+mov ax,es:[sectornum]
+movzx eax,ax
+mov ebx,100h
+mul ebx
+mov ecx,eax
+mov dx,es:[baseport]
+add dx,7
+waitfree:
+in al,dx
+cmp al,58h
+jnz waitfree
+mov dx,es:[baseport]
+rep insw
+ret
+readsector endp
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+getwavinfo proc near
+mov ax,3d00h
+mov dx,offset wavname
+int 21h
+mov es:[filehandle],ax
+mov bx,ax
+mov ax,4202h
+mov cx,0
+mov dx,0
+int 21h
+mov es:[highpage],dx
+mov es:[lowpage],ax
+mov ax,4200h
+mov cx,0
+mov dx,0
+int 21h
+mov ax,3f00h
+mov cx,3ah             ;wav file header size
+mov dx,offset wavheader
+int 21h
+mov ax,es:[lowpage]
+sbb ax,3ah             ;wav file header size
+mov es:[lowpage],ax
+mov ax,es:[highpage]
+sbb ax,0
+mov es:[highpage],ax
+ret
+getwavinfo endp
+
+readfile proc near
+mov ax,es:[wavbaseseg]
+mov ds,ax
+mov dword ptr es:[wavblocknum],0
+readblock:
+mov ax,es:[highpage]
+cmp ax,0
+jz readdetail
+mov ax,3f00h
+mov bx,es:[filehandle]
+mov cx,0ffffh
+mov dx,0
+int 21h
+mov ax,3f00h
+mov cx,1
+mov dx,0ffffh
+int 21h
+mov ax,es:[highpage]
+dec ax
+mov es:[highpage],ax
+inc dword ptr es:[wavblocknum]
+mov eax,es:[wavblocknum]
+cmp eax,4
+jz toreturn
+mov ax,ds
+add ax,1000h
+mov ds,ax
+jmp readblock
+readdetail:
+mov ax,3f00h
+mov bx,es:[filehandle]
+mov cx,es:[lowpage]
+mov dx,0
+int 21h
+mov word ptr es:[lowpage],0
+toreturn:
+ret
+readfile endp
+code0 ends
+end start

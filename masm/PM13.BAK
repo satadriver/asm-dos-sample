@@ -1,0 +1,325 @@
+.386p
+code1 segment para use16
+assume cs:code1
+db 0eah
+dw 0
+dw 10h
+
+toreal:                 ;selector---offset format could find here!!!!!
+mov ax,38h        
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov eax,cr0
+and al,0feh
+mov cr0,eax
+db 0eah
+dw offset rm16
+dw seg rm16
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+mov ax,30h
+mov ss,ax             ;stack segment is neccesary for interrruption and exception!!!
+mov ax,800h
+mov sp,ax
+mov ax,28h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+
+mov al,0fdh      ;reserve the keyboard interruption!
+out 21h,al          
+
+mov esi,0
+mov al,66       ;this paragraph will show letters -- "begin"
+mov [esi],al
+inc esi
+mov al,41h
+mov [esi],al
+INC ESI
+mov al,69
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+INC ESI
+MOV AL,71
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+INC ESI
+MOV AL,73
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+INC ESI
+MOV AL,78
+mov [esi],al
+INC ESI
+mov al,41h
+mov [esi],al
+
+mov ax,0fffh
+l1:mov cx,0ffffh         ;stay a little time for debug
+l2:dec cx
+cmp cx,0
+jnz l2
+dec ax
+cmp ax,0
+jnz l1
+
+
+MOV ESI,160
+;sti
+l0:
+NOP
+NOP
+jmp l0
+CODE2 ENDS
+
+CODE3 SEGMENT PARA USE32
+ASSUME CS:CODE3
+
+;mov eax,CR0
+;OR eax,3000h
+;MOV CR0,Eax
+mov ax,28h           
+mov ds,ax              
+mov es,ax                
+mov fs,ax                  
+mov gs,ax
+                                       ;upper five instruction could be 
+;in al,64h
+;and al,1
+;cmp al,1
+;jz l4
+IN AL,60H
+CMP AL,1
+JZ L3
+cmp al,1eh
+jz l10
+cmp al,1fh
+jz l11
+cmp al,20h
+jz l12
+cmp al,21h
+jz l13
+cmp al,22h
+jz l15
+cmp al,23h
+jz l16
+cmp al,24h
+jz l17
+cmp al,25h
+jz l18
+cmp al,26h
+jz l19
+      jmp l4
+      l10:
+      mov al,41h
+      jmp l14
+      l11:
+      mov al,53h
+      jmp l14
+      l12:
+      mov al,44h
+      jmp l14
+      l13:mov al,46h
+      jmp l14
+      l15:
+      mov al,47h
+      jmp l14
+      l16:
+      mov al,48h
+      jmp l14
+      l17:
+      mov al,4ah
+      jmp l14
+      l18:
+      mov al,4bh
+
+      jmp l14
+      l19:
+      mov al,4ch
+      jmp l14
+jmp l4
+l14:
+MOV byte ptr [eSI],AL
+inc esi
+mov cl,bl
+MOV byte ptr [SI],CL
+inc bl
+INC ESI
+l4:
+mov al,20h                     ;
+out 20h,al                       ;
+iretd                                ;
+l3:cli
+mov al,0
+out 21h,al
+mov al,20h
+out 20h,al                                    ;
+mov al,40h                                   ;softdisk be masked
+out 21h,al
+DB 0EAH                                                  
+DW OFFSET TOREAL                   ;offset---selecter
+DW 0                                                         
+DW 8                                                         
+code3 ends
+
+code4 segment para use32
+assume cs:code4
+iretd
+;l5:
+;nop
+;nop
+;jmp l5                          ;iretd could be right also
+code4 ends
+
+
+code5 segment para use32
+assume cs:code5
+iretd
+code5 ends
+
+gdtseg segment use16
+spptr dw 0
+ssptr dw 0
+gdtlen dw gdtend-1
+gdtbase dd 0
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 004098000000ffffh
+gdt3 dq 004098000000ffffh
+gdt4 dq 004098000000ffffh
+gdt5 dq 0040920b8000ffffh
+gdt6 dq 0040920000000fffh
+gdt7 dq 000092000000ffffh
+gdt8 dq 004098000000ffffh
+gdtend=$-gdt0
+gdtseg ends
+
+idtseg segment para use16
+DOSIDT DW 0
+DD 0
+idtlen dw idtend-1
+idtbase dd 0
+idtbegin=$
+rept 9
+dq 00008f0000200000h
+endm
+
+dq 00008e0000180000h
+
+rept 246
+dq 00008f0000200000h
+endm
+
+idtend=$-idtbegin
+idtseg ends
+
+stack0 segment para use32
+db 1000h dup (0)
+stack0 ends
+
+code0 segment para use16
+assume cs:code0,ds:gdtseg,es:idtseg
+start:
+XOR EAX,EAX
+MOV AX,GDTSEG
+MOV DS,AX
+SHL EAX,4
+XOR ESI,ESI
+MOV SI,OFFSET GDT0
+ADD EAX,ESI
+MOV DWORD PTR DS:[GDTBASE],EAX
+
+XOR EAX,EAX
+MOV AX,CODE1
+SHL EAX,4
+MOV WORD PTR DS:[GDT1+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT1+4],AL
+
+XOR EAX,EAX
+MOV AX,CODE2
+SHL EAX,4
+MOV WORD PTR DS:[GDT2+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT2+4],AL
+
+XOR EAX,EAX
+MOV AX,CODE3
+SHL EAX,4
+MOV WORD PTR DS:[GDT3+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT3+4],AL
+
+XOR EAX,EAX
+MOV AX,CODE4
+SHL EAX,4
+MOV WORD PTR DS:[GDT4+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT4+4],AL
+
+XOR EAX,EAX
+MOV AX,CODE5
+SHL EAX,4
+MOV WORD PTR DS:[GDT8+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT8+4],AL
+
+XOR EAX,EAX
+MOV AX,STACK0
+SHL EAX,4
+MOV WORD PTR DS:[GDT6+2],AX
+SHR EAX,16
+MOV BYTE PTR DS:[GDT6+4],AL
+
+MOV AX,SP
+MOV word ptr DS:[SPPTR],AX
+MOV AX,SS
+MOV  word ptr DS:[SSPTR],AX
+
+XOR EAX,EAX
+MOV AX,IDTSEG
+MOV ES,AX
+SHL EAX,4
+XOR ESI,ESI
+MOV SI,OFFSET IDTBEGIN
+ADD EAX,ESI
+MOV DWORD PTR ES:[IDTBASE],Eax
+
+SIDT qword ptr es:[DOSIDT]                                        ;neccessary back to dos
+lgdt qword ptr ds:[gdtlen]
+cli
+lidt qword ptr es:[idtlen]                               
+mov al,2
+out 92h,al
+mov eax,cr0
+or eax,1
+mov cr0,eax
+db 0eah
+dw 0
+dw 8
+
+rm16:    CLI                                                       ;not neccesary
+MOV AX,IDTSEG
+MOV ES,AX
+LIDT QWORD PTR ES:[DOSIDT]
+mov ax,gdtseg
+mov ds,ax
+lss sp,dword ptr ds:[spptr]                                  ;important 
+sti
+mov ah,4ch
+int 21h
+code0 ends
+end start
+

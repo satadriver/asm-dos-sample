@@ -1,0 +1,200 @@
+desc struc
+limitl dw 0
+basel dw 0
+basem db 0
+attr dw 0
+baseh db 0
+desc ends
+
+pdesc struc
+limit dw 0
+base dd 0
+pdesc ends
+
+.386p
+gdtseg segment para use16
+gdtptr pdesc <gdtlen-1,0>
+
+gdt0 desc <>
+gdt1 desc <code1len-1,code1,0,98h,0>
+gdt1sel=$-gdt0
+gdt2 desc <code2len-1,code2,0,4098h,0>
+gdt2sel=$-gdt0
+gdt3 desc <code3len-1,code3,0,40f8h,0>
+gdt3sel=$-gdt0
+gdt4 desc <0ffffh,0a000h,0,40f2h,0>
+gdt4sel=$-gdt0
+gdt5 desc <0fffh,stack0,0,4092h,0>
+gdt5sel=$-gdt0
+gdt6 desc <0fffh,stack1,0,40b2h,0>
+gdt6sel=$-gdt0
+gdt7 desc <0fffh,stack2,0,40d2h,0>
+gdt7sel=$-gdt0
+gdt8 desc <0fffh,stack3,0,40f2h,0>
+gdt8sel=$-gdt0
+gdt9 desc <68h,tssseg,0,89h,0>;;;;;;;;;;;;4089??????
+gdt9sel=$-gdt0
+gdtlen=$-gdt0
+gdtnum=gdtlen/(size desc)
+gdtseg ends
+
+stack0 segment para use16
+ db 1000h dup(0)
+stack0len=1000h
+stack0 ends
+
+stack1 segment para use16
+ db 1000h dup(0)
+stack1len=1000h
+stack1 ends
+
+stack2 segment para use16
+ db 1000h dup(0)
+stack2len=1000h
+stack2 ends
+
+stack3 segment para use16
+ db 1000h dup(0)
+stack3len=1000h 
+stack3 ends
+
+tssseg segment para use16
+dd 0
+dd stack0len
+dd gdt5sel
+dd stack1len
+dd gdt6sel
+dd stack2len 
+dd gdt7sel
+dd 18 dup (0)
+dw 0 
+dw $+2
+db 0ffh
+tssseg ends
+
+code1 segment para use16
+assume  cs:code1
+begin1:
+mov ax,gdt9sel
+ltr ax
+db 09ah
+dw 0
+dw gdt2sel
+
+real:
+mov eax,cr0
+and eax,0fffffffeh
+mov cr0,eax
+db 09ah
+dw offset rm16
+dw seg rm16
+rm16:mov al,0
+out 92h,al
+mov ax,3
+int 10h
+mov ah,4ch
+int 21h
+code1len=$-begin1
+code1 ends
+
+code2 segment para use32
+assume cs:code2
+begin2:
+xor eax,eax
+mov ax,gdt5sel
+mov ss,ax
+mov ax,1000h
+mov esp,eax
+mov ax,gdt8sel
+push eax
+mov ax,1000h
+push eax
+xor eax,eax
+mov ax,gdt3sel+3
+push  eax
+mov ax,offset begin3
+push eax
+ret
+code2len=$-begin2
+code2 ends
+
+code3 segment para use32
+assume  cs:code3
+begin3:mOV AX,20H
+MOV DS,AX
+MOV ES,AX
+MOV FS,AX
+MOV GS,AX
+MOV eSI,0
+MOV eCX,0FFFFH
+MOV AL,1
+L0:
+MOV [eSI],AL
+INC eSI
+inc al
+LOOP L0
+MOV CX,0FFFFH
+L1:MOV AX,0FFFFH
+L2:DEC AX
+CMP AX,0
+JNZ L2
+DEC CX
+CMP CX,0
+JNZ L1
+                
+db 09ah
+dw offset real
+dw 0
+dw gdt1sel
+code3len=$-begin3
+CODE3 ENDS
+
+code segment para use16
+assume  cs:code
+start:
+mov ax,gdtseg
+mov ds,ax
+mov cx,gdtnum
+mov si,offset gdt0
+ll0:
+mov ax,[si].basel
+movzx eax,ax
+shl eax,4
+shld edx,eax,16
+mov [si].basel,ax
+mov [si].basem,dl
+mov [si].baseh,dh
+add si,size desc
+loop ll0
+
+mov bx,16
+mov ax,seg gdt0
+mul bx
+mov bx,offset gdt0
+mov cx,0
+add ax,bx
+adc dx,cx
+mov word ptr ds:[gdtptr].base,ax
+mov word ptr ds:[gdtptr].base+2,dx
+
+mov ax,13h
+int 10h
+
+LGDT QWORD PTR DS:[GDTptr]
+CLI
+MOV AL,2
+OUT 92H,AL
+MOV EAX,CR0
+OR EAX,1
+MOV CR0,EAX
+DB 09AH
+dw 0
+DW gdt1sel
+
+
+CODE ENDS
+END START
+
+
+
+

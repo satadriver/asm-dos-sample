@@ -1,0 +1,131 @@
+.MODEL SMALL
+.386
+
+.DATA 
+BMPNAME DB 'array.BMP',00
+COLORTABLE DB 400H DUP (0)
+MAP DB 1024 DUP (0)
+
+
+.CODE
+START:
+MOV AX,@DATA
+MOV DS,AX
+mov es,ax
+MOV AX,3D00H
+MOV DX,OFFSET BMPNAME
+INT 21H
+MOV BX,AX
+MOV AX,4200H
+MOV CX,0
+MOV DX,36H
+INT 21H
+MOV AX,3F00H
+MOV CX,400H
+MOV DX,OFFSET COLORTABLE
+INT 21H
+
+MOV AX,3F00H
+MOV CX,400h
+MOV DX,OFFSET MAP
+INT 21H
+PUSH BX
+
+mov ax,4f02h
+mov bx,13h
+int 10h
+
+cld
+mov cx,100h
+mov si,offset colortable
+mov ax,0
+l0:
+push ax
+mov dx,3c8h
+out dx,al
+mov dx,3c9h
+add si,2
+lodsb
+shr al,2
+out dx,al
+
+sub si,2
+lodsb
+shr al,2
+out dx,al
+
+sub si,2
+lodsb
+shr al,2
+out dx,al
+
+add si,3
+pop ax
+inc ax
+loop l0
+
+
+
+MOV AX,0
+INT 33H
+mov ax,1
+int 33h
+
+
+MOV AX,0CH
+MOV CX,0ffh
+MOV DX,OFFSET SHOW
+MOV AX,@code
+MOV ES,AX
+INT 33H
+
+LL:
+in al,64h
+test al,1
+jz ll
+IN AL,60H
+CMP AL,39h
+JNZ LL
+
+MOV AX,3
+INT 10H
+MOV AH,4CH
+INT 21H
+
+SHOW PROC far
+PUSHA
+PUSH DS
+PUSH ES
+
+
+mov ax,dx
+mov bx,320
+mul bx
+add ax,cx
+MOV DI,AX
+
+MOV AX,0A000H
+MOV ES,AX
+MOV AX,@DATA
+MOV DS,AX
+MOV SI,OFFSET MAP
+
+
+MOV CX,32
+CLD
+L1:
+PUSH CX
+PUSH DI
+MOV CX,32
+REP MOVSB
+POP DI
+ADD DI,320
+POP CX
+LOOP L1
+
+POP ES
+POP DS
+POPA
+RETf
+SHOW ENDP
+END START

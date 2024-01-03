@@ -1,0 +1,316 @@
+;指令 FSIN与FCOS的机器码是0fed9h与0ffd9h,masm5.0并不能汇编为正确的指令，需要直接写入机器码
+.386p
+stack segment stack
+db 2000h dup (0)
+stack ends
+
+data segment para use16
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 004098000000ffffh
+gdt3 dq 004092000000ffffh
+gdt4 dq 0d0cf92000000ffffh
+gdt5 dq 004092800000ffffh
+gdt6 dq 000092000000ffffh
+gdtend=$-gdt0
+gdtlimit dw gdtend-1
+gdtbase dd 0
+
+stackptr dd 0
+x1 dd 10
+y1 dd 10
+x2 dd 150
+y2 dd 20
+deltax dd 0
+deltay dd 0
+deltax_sign dd 0
+deltay_sign dd 0
+deltaxplus  dd 0
+deltaYplus  dd 0
+rato_x  dd 0
+rato_y  dd 0
+color   db 0ffh
+
+
+scanline dd 0  
+centerx dd 512
+centery dd 384
+dotx    dd 0
+doty    dd 0
+radius  dd 200
+angle   dd 0
+arc     dd 180
+data ends
+
+code segment para use16
+assume cs:code
+start:
+init proc near
+mov ax,stack
+mov ss,ax
+xor eax,eax
+xor ebx,ebx
+mov ax,data
+mov ds,ax
+mov es,ax
+shl eax,4
+push eax
+mov word ptr ds:[gdt3+2],ax
+shr eax,16
+mov byte ptr ds:[gdt3+4],al
+pop eax
+mov bx,offset gdt0
+add eax,ebx
+mov ds:[gdtbase],eax
+
+xor eax,eax
+mov ax,code1
+shl eax,4
+mov word ptr ds:[gdt1+2],ax
+shr eax,16
+mov byte ptr ds:[gdt1+4],al
+
+xor eax,eax
+mov ax,code2
+shl eax,4
+mov word ptr ds:[gdt2+2],ax
+shr eax,16
+mov byte ptr ds:[gdt2+4],al
+
+mov ax,4f02h
+mov bx,105h
+int 10h
+mov ax,4f06h
+mov bx,1
+int 10h
+mov word ptr dS:[scanline],cx
+mov ax,ss
+shl eax,16
+mov ax,sp
+mov dword ptr ds:[stackptr],eax
+
+cli
+lgdt qword ptr ds:[gdtlimit]
+mov al,2
+out 92h,al
+mov eax,cr0
+or al,1
+mov cr0,eax
+db 0eah
+dw 0
+dw 8
+dosmode:
+mov ax,data
+mov ds,ax
+mov es,ax
+lss sp,dword ptr ds:[stackptr]
+mov ah,0
+int 16h
+mov ax,4f02h
+mov bx,3
+int 10h
+mov ah,4ch
+int 21h
+code ends
+
+
+code1 segment para use16
+assume cs:code1
+db 0eah
+dw 0
+dw 10h
+todos:
+mov ax,30h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov eax,cr0
+and al,0feh
+mov cr0,eax
+jmp far ptr dosmode
+code1 ends
+
+
+code2 segment para use32
+assume cs:code2
+mov ax,18h
+mov ds,ax
+mov fs,ax
+mov gs,ax
+mov ax,20h
+mov es,ax
+mov ax,28h
+mov ss,ax
+mov esp,1000h
+
+
+
+call near ptr clock
+ll:
+in al,60h
+cmp al,1
+jnz ll
+call near ptr line
+jmp toback
+
+
+clock proc near
+mov ecx,12
+draw:
+push ecx
+finit
+fild dword ptr ds:[arc]
+fild dword ptr ds:[angle]
+fdiv st(0),st(1)
+fldpi
+fmul st(0),st(1)
+dw 0fed9h 
+fild dword ptr ds:[radius]
+fmul st(0),st(1)
+fild dword ptr dS:[centery]
+fsub st(0),st(1)
+fist dword ptr ds:[doty]
+finit
+fild dword ptr ds:[arc]
+fild dword ptr ds:[angle]
+fdiv st(0),st(1)
+fldpi
+fmul st(0),st(1)
+dw 0ffd9h
+fild dword ptr ds:[radius]
+fmul st(0),st(1)
+fild dword ptr ds:[centerx]
+fadd st(0),st(1)
+fist dword ptr ds:[dotx]
+mov eax,dword ptr ds:[doty]
+mov ebx,ds:[scanline]
+mul ebx
+add eax,dword ptr ds:[dotx]
+mov edi,eax
+mov ecx,4
+drawclockRec:
+push ecx
+push edi
+mov ecx,4
+mov al,0ffh
+rep stosb
+pop edi
+add edi,ds:[scanline]
+pop ecx
+loop drawclockREC
+add dword ptr ds:[angle],30
+pop ecx
+dec ecx
+cmp ecx,0
+jz clockret
+JMP draw
+clockret:
+retn
+clock endp
+
+
+line proc near
+mov eax,dword ptr ds:[x1]
+mov ebx,dword ptr ds:[x2]
+sub eax,ebx
+mov dword ptr ds:[deltax],eax
+mov dword ptr ds:[deltax_sign],eax
+mov ecx,dword ptr ds:[y1]
+mov edx,dword ptr ds:[y2]
+sub ecx,edx
+mov dword ptr ds:[deltay],ecx
+mov dword ptr ds:[deltay_sign],ecx
+cmp eax,80000000h
+jb notnegx
+neg eax
+notnegx:
+mov dword ptr ds:[deltaxplus],eax
+cmp ecx,80000000h
+jb notnegy
+neg ecx
+notnegy:
+mov dword ptr ds:[deltayplus],ecx
+cmp eax,ecx
+jb yx
+jmp xy
+yx:
+mov ecx,dword ptr ds:[deltayplus]
+slopelineyx:
+push ecx
+finit
+fild dword ptr ds:[deltay]
+fild dword ptr ds:[deltax]
+fdiv st(0),st(1)
+fild dword ptr ds:[deltay_sign]
+fmul st(0),st(1)
+fistp dword ptr ds:[rato_x]
+mov eax,dword ptr ds:[deltay_sign]
+add eax,dword ptr ds:[y2]
+mov ebx,ds:[scanline]
+mul ebx
+add eax,ds:[rato_x]
+add eax,ds:[x2]
+call near ptr drawpixel
+cmp dword ptr ds:[deltay_sign],80000000h
+jbe plusdeltay
+inc dword ptr ds:[deltax_sign]
+jmp nextyx
+plusdeltay:
+dec dword ptr ds:[deltax_sign]
+nextyx:
+pop ecx
+loop slopelineyx
+jmp lineret
+
+xy:
+mov ecx,dword ptr ds:[deltaxplus]
+slopelinexy:
+push ecx
+finit
+fild dword ptr ds:[deltax]
+fild dword ptr ds:[deltay]
+fdiv st(0),st(1)
+fild dword ptr ds:[deltax_sign]
+fmul st(0),st(1)
+fistp dword ptr ds:[rato_y]
+mov eax,dword ptr ds:[rato_y]
+add eax,dword ptr ds:[y2]
+mov ebx,ds:[scanline]
+mul ebx
+add eax,ds:[deltax_sign]
+add eax,ds:[x2]
+call near ptr drawpixel
+cmp dword ptr ds:[deltax_sign],80000000h
+jbe plusdeltax
+inc dword ptr ds:[deltax_sign]
+jmp nextxy
+plusdeltax:
+dec dword ptr ds:[deltax_sign]
+nextxy:
+pop ecx
+loop slopelinexy
+
+lineret:
+retn
+line endp
+
+
+
+drawpixel proc near
+mov edi,eax
+mov al,ds:[color]
+stosb
+retn
+drawpixel endp
+
+
+tobacK:
+db 0eah
+dw offset todos
+dw 0
+dw 8
+
+code2 ends
+end start

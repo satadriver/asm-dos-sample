@@ -1,0 +1,66 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: DEMO - Win32 Debug--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP36.tmp" with contents
+[
+/nologo /MLd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /Fp"Debug/DEMO.pch" /YX /Fo"Debug/" /Fd"Debug/" /FD /GZ /c 
+"C:\masm5.0\8139\p-guide(8139)\SOURCE\DEMO.C"
+]
+Creating command line "cl.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP36.tmp" 
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP37.tmp" with contents
+[
+kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:console /incremental:yes /pdb:"Debug/DEMO.pdb" /debug /machine:I386 /out:"Debug/DEMO.exe" /pdbtype:sept 
+".\Debug\DEMO.OBJ"
+]
+Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP37.tmp"
+<h3>Output Window</h3>
+Compiling...
+DEMO.C
+c:\masm5.0\8139\p-guide(8139)\source\demo.h(5) : warning C4005: 'NULL' : macro redefinition
+        c:\program files\microsoft visual studio\vc98\include\stdio.h(212) : see previous definition of 'NULL'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(8) : error C2143: syntax error : missing ')' before '*'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(8) : error C2143: syntax error : missing '{' before '*'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(8) : error C2059: syntax error : ')'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(9) : error C2061: syntax error : identifier 'NewFunction'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(9) : error C2059: syntax error : ';'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(9) : error C2059: syntax error : 'type'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(12) : error C4226: nonstandard extension used : 'far' is an obsolete keyword
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(13) : error C4226: nonstandard extension used : 'far' is an obsolete keyword
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(50) : warning C4013: 'gotoxy' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(89) : error C2061: syntax error : identifier 'NewFunction'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(89) : error C2059: syntax error : ';'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(89) : error C2059: syntax error : 'type'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(124) : error C2059: syntax error : 'bad suffix on number'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(125) : error C2059: syntax error : 'bad suffix on number'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(126) : error C2059: syntax error : 'bad suffix on number'
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(141) : warning C4013: 'outportb' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(155) : warning C4013: 'outport' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(172) : warning C4013: 'FP_OFF' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(181) : warning C4013: 'FP_SEG' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(257) : warning C4013: 'disable' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(261) : warning C4013: 'CopyFromPacketToBuffer' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(265) : warning C4013: 'enable' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(307) : warning C4013: 'memcpy' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(351) : warning C4013: 'inportb' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(400) : warning C4013: 'getvect' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(400) : warning C4047: '=' : 'int *(__cdecl *)(void )' differs in levels of indirection from 'int '
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(400) : error C2106: '=' : left operand must be l-value
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(400) : warning C4550: expression evaluates to a function which is missing an argument list
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(403) : warning C4013: 'setvect' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(403) : error C2065: 'NewFunction' : undeclared identifier
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(469) : warning C4013: 'clrscr' undefined; assuming extern returning int
+c:\masm5.0\8139\p-guide(8139)\source\demo.c(531) : error C2065: 'directvideo' : undeclared identifier
+Error executing cl.exe.
+
+
+
+<h3>Results</h3>
+DEMO.exe - 17 error(s), 16 warning(s)
+</pre>
+</body>
+</html>

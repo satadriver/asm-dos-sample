@@ -1,0 +1,1112 @@
+.386p
+mouse segment para use16
+assume cs:mouse
+org 0
+jmp main
+
+align 16
+gdt0                dq 0
+gdt1                dq 000098000000ffffh ;Pm16
+gdt2                dq 004098000000ffffh ;Pm32
+gdt3                dq 00cf92000000ffffh ;data Parameter segment
+gdt4                dq 00cf92000000ffffh ;VESA Video Seg
+gdt5                dq 10cf92000000ffffh ;Video buffer Seg
+gdt6                dq 000092000000ffffh ;normal
+gdtend=$
+gdtlimit            dw gdtend-1
+gdtbase             dd 0
+packetNum        db 0
+counter             db 0
+mousestatus         db 0
+deltaX              db 0
+deltaY              db 0
+deltaFlag  	    db 0
+
+mousex              dw 0
+                    dw 0
+mousey              dw 0
+                    dw 0
+scanline            dw 0
+                    dw 0
+
+TextArray	    db 0c0h
+	db 0c0h
+	db 0e0h
+	db 0e0h
+	db 0f0h
+	db 0f8h
+	db 0f8h
+	db 0fch
+	db 0fch
+	db 0feh
+	db 0ffh
+	db 0feh
+	db 0fch
+	db 0f8h
+	db 0f0h
+	db 0f0h
+TextMouseFlag	    db 1
+		
+                    
+scanlineByte        dd 0                    
+currentPOS          dw 0
+mouseflag           dw 0aeeh
+coveredCHAR         dw 0
+Linecolor           dd 0cch
+LineWidth	    dd 10
+mouseseg            dw 0
+mousebmp            db 'finger.bmp',0 ;random 32x32x8 bitmap
+bmphead             db 36h dup (0)
+colortable          db 400h dup (0)
+bmpdata             db 1024 dup (0)
+buffer              db 1024 dup (0)
+mousebmpvesa        db 'mouse7.bmp',0 ;random 64x64x8 bitmap
+bmpheadVESA         db 36h dup (0)
+colortableVESA      db 400h dup (0)
+bmpdataVESA         db 4096 dup (0)
+mousebmpvesa4       db '1.bmp',0
+bmpheadVESA4        db 36h dup (0)
+bmpdataVESA4        db 4096 dup (0)
+bufferVESA          db 4096 dup (0)
+currentposVESA      DD 0
+videomode           dw 0
+stackptr            dd 0
+videomodeflag       dd 0
+vesainfo            db 100h dup (0)
+msg_realloc_error   db 'Reallocation error!',0ah,0dh,24h
+msg_load_success    db 'Mouse had successfully loaded!',0dh,0ah,24h
+msg_ps2		    db 'U mouse is PS/2 mode',24h
+msg_MSintelliMouse    db 'U mouse is MSintellimouse',24h
+msg_MS		    db 'Ur mouse is MS mode',24h
+msg_NotSurport    	    DB 'Ur Mouse is Not surported!',24h
+
+main:
+pushad
+push ds
+push es
+push fs
+push gs
+cld
+mov ax,cs
+mov ds,ax
+xor ax,ax
+mov si,offset counter
+mov al,cs:[si]
+inc al
+mov cs:[si],al
+push ax
+add si,ax
+in al,60h
+mov cs:[si],al
+pop ax
+cmp al,cs:[packetNum]
+jz showmouse
+jmp return
+
+showmouse:
+mov byte ptr cs:[counter],0
+mov ax,4f03h
+int 10h
+;push bx
+;cmp bx,cs:[VideoMode]
+;jz CheckScanline
+;mov word ptr cs:[CurrentPos],0
+;mov dword ptr cs:[CUrrentPosVesa],0
+;jmp NotChangeMode
+;CHeckScanline:
+;mov ax,4f06h
+;mov bx,1
+;int 10h
+;cmp cx,word ptr cs:[Scanline]
+;jz NotChangeMode
+;mov word ptr cs:[CurrentPos],0
+;mov dword ptr cs:[CurrentPosVesa],0
+;NotChangeMode:
+;pop bx
+mov cs:[videomode],bx
+cmp bx,3
+jz mode3
+cmp bx,13h
+jz mode13h
+jmp modeVESA
+
+mode3:
+jmp mousemode3
+mode13h:
+jmp mousemode13h
+modevesa:
+cmp word ptr ds:[videomode],112h
+jz bit32
+cmp word ptr ds:[videomode],115h
+jz bit32
+cmp word ptr ds:[videomode],118h
+jz bit32
+cmp word ptr ds:[videomode],11bh
+jz bit32
+mov dword ptr ds:[videomodeflag],0
+jmp mousemodeVESA
+bit32:
+mov dword ptr ds:[videomodeflag],1
+jmp mousemodeVESA
+
+
+mousemode3 proc near
+cmp byte ptr cs:[TextMOuseFlag],0
+jz notInitTextMouse
+mov ax,cs
+mov es,ax
+mov ax,1100h
+mov bx,800h
+mov cx,2
+mov dx,0eeh
+mov bp,offset TextArray
+int 10h
+mov byte ptr cs:[TextmouseFlag],0
+NotInitTextMouse:
+mov ax,0b800h
+mov es,ax
+mov word ptr cs:[scanline],160
+cmp word ptr cs:[currentpos],0
+jz first
+
+push word ptr cs:[coveredchar] 
+mov di,word ptr cs:[currentpos]
+pop word ptr es:[di]
+first:
+mov al,ds:[deltax]
+movsx ax,al
+add word ptr ds:[mousex],ax
+mov al,ds:[deltay]
+movsx ax,al
+sub word ptr ds:[mousey],ax
+
+cmp word ptr ds:[mousey],0
+jge NOadjust_Y_small
+add word ptr ds:[mousey],400
+jmp check_X
+noadjust_y_small:
+cmp word ptr ds:[mousey],400
+jl check_X
+sub word ptr ds:[mousey],400
+
+check_X:
+cmp word ptr ds:[mousex],0
+jge noadjust_x_small
+add word ptr ds:[mousex],640
+jmp setcursor
+noadjust_x_small:
+cmp word ptr ds:[mousex],640
+jl setcursor
+sub word ptr ds:[mousex],640
+
+setcursor:
+mov ax,ds:[mousey]
+shr ax,4
+mov bx,ds:[scanline]
+mul bx
+mov bx,ds:[mousex]
+;shr bx,4
+shr bx,2
+add ax,bx	
+		;delete "shr bx,4" and insert "and bx,0fffeh" behind "add ax
+		;,bx" is not right,why???
+		;cause that will lost one position!only 1/2 cursor can be set
+		;the char byte is odd number!u must dec the current position
+		;one char resident 2 bytes
+		;first is char(but is odd),second is color
+and ax,0fffeh
+mov ds:[currentpos],ax
+mov di,ds:[currentpos]
+push word ptr es:[di]
+pop word  ptr cs:[coveredCHAR]
+push word ptr cs:[mouseflag]
+pop word  ptr es:[di]
+
+cld
+add di,2
+test byte ptr ds:[mousestatus],1
+jnz lbuttondown
+test byte ptr ds:[mousestatus],2
+jnz rbuttondown
+test byte ptr ds:[mousestatus],4
+jnz mbuttondown
+jmp mode3ToReturn
+lbuttondown:
+mov si,offset msg_lbclk
+jmp get_msg
+mbuttondown:
+mov si,offset msg_mbclk
+jmp get_msg
+rbuttondown:
+mov si,offset msg_rbclk
+get_msg:
+mov al,0b6h
+out 43h,al
+mov ax,200h
+out 42h,al
+xchg ah,al
+out 42h,al
+in al,61h
+or al,1
+out 61h,al
+in al,61h
+test al,2
+jnz closeSpeaker
+or al,2
+out 61h,al
+jmp show_msg
+closeSpeaker:
+and al,0fdh
+out 61h,al
+show_msg:
+lodsb
+cmp al,0
+jz mode3ToReturn
+mov ah,0eh
+stosw
+jmp show_msg
+
+mode3ToReturn:
+jmp return
+msg_rbclk db 'U strike Right Button here',2,0
+msg_mbclk db 'U strike MId button here',2,0
+msg_lbclk db 'U strike Left Button here',2,0
+mousemode3 endp
+
+
+
+
+
+mousemode13h proc near
+mov ax,0a000h
+mov es,ax
+mov word ptr cs:[scanline],320
+cmp word ptr cs:[currentpos],0
+jz switch_first_13h
+
+mov si,offset buffer
+mov di,cs:[currentpos]
+call restore
+jmp NOTswitch_first_13h
+
+switch_first_13h:
+mov cs:[scanline],320           ;why not  call set colortable? mouse driver                       
+NOTswitch_first_13h:
+mov al,cs:[DELTAX]
+movsx ax,al
+add cs:[mousex],ax
+mov al,cs:[deltaY]
+movsx ax,al
+sub cs:[mousey],ax
+mov ax,cs:[mousey]
+mov bx,cs:[scanline]
+mul bx
+add ax,cs:[mousex]
+mov cs:[currentpos],ax
+
+mov di,cs:[currentpos]
+mov si,offset buffer
+call save
+
+mov di,cs:[currentpos]
+mov si,offset bmpdata
+call showmousebmp
+test byte ptr ds:[mousestatus],1
+jz mousemode13_ret
+mov di,ds:[currentpos]
+sub di,320
+mov al,byte ptr ds:[Linecolor]
+mov ah,al
+stosw
+add di,318
+stosw
+mousemode13_ret:
+jmp return
+mousemode13h endp
+
+
+
+showmousebmp proc near
+mov cx,32
+show_line_32x32x8:
+push cx
+push di
+mov cx,32
+show_32x32x8:
+lodsb
+cmp al,0FFH
+jz andpix
+not byte ptr es:[di]
+inc di
+jmp nextpix
+andpix:
+and AL,BYTE PTR ES:[DI]
+stosb
+nextpix:
+loop show_32x32x8
+pop di
+add di,320
+pop cx
+loop show_line_32x32x8
+ret
+showmousebmp endp
+
+
+
+save proc near
+mov cx,32
+save_line_32x32x8:
+push cx
+push di
+mov cx,32
+save_32x32x8:
+mov al,es:[di]
+mov ds:[si],al
+inc si
+inc di
+loop save_32x32x8
+pop di
+add di,320
+pop cx
+loop save_line_32x32x8
+ret
+save endp
+
+
+
+
+restore proc near
+mov cx,32
+res_line_32x32x8:
+push cx
+push di
+mov cx,32
+rep movsb
+pop di
+add di,320
+pop cx
+loop res_line_32x32x8
+ret
+restore endp
+
+
+
+
+setcolor proc near
+mov al,0
+mov dx,3c8h
+out dx,al
+mov dx,3c9h
+lea si,ds:[colortable]
+mov cx,100h
+setpalette:
+add si,2
+lodsb
+shr al,2
+out dx,al
+sub si,2
+lodsb
+shr al,2
+out dx,al
+sub si,2
+lodsb
+shr al,2
+out dx,al
+add si,3
+loop setpalette
+retn
+setcolor endp
+
+
+mousemodeVESA proc near
+mov ax,4f06h
+mov bx,1
+int 10h
+mov ds:[scanline],cx
+xor eax,eax
+mov ax,ds
+shl eax,4
+xor ebx,ebx
+mov bx,offset gdt0
+add eax,ebx
+mov ds:[gdtbase],eax
+
+
+xor eax,eax
+mov ax,Pm16
+shl eax,4
+mov word ptr ds:[gdt1+2],ax
+shr eax,16
+mov byte ptr ds:[gdt1+4],al
+mov byte ptr ds:[gdt1+7],ah
+xor eax,eax
+mov ax,Pm32
+shl eax,4
+mov word ptr ds:[gdt2+2],ax
+shr eax,16
+mov byte ptr ds:[gdt2+4],al
+mov byte ptr ds:[gdt2+7],ah
+
+mov ax,ss
+shl eax,16
+mov ax,sp
+mov ds:[stackptr],eax
+lgdt qword ptr ds:[gdtlimit]
+mov al,2
+out 92h,al
+cli
+mov eax,cr0
+or al,1
+mov cr0,eax
+db 0eah
+dw 0
+dw 8
+dosmode:
+mov ax,cs:[mouseseg]
+mov ds,ax
+mov es,ax
+lss sp,dword ptr ds:[stackptr]
+jmp return
+mousemodeVESA endp
+
+
+
+return:
+mov al,20h
+out 0a0h,al
+out 20h,al
+pop gs
+pop fs
+pop es
+pop ds
+popad 
+sti
+iret
+mouselen dw $
+mouse ends
+
+
+
+Pm16 segment para use16
+assume cs:Pm16
+db 0eah
+dw 0
+dw 10h
+todos:
+mov ax,30h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov eax,cr0
+and al,0feh
+mov cr0,eax
+jmp far ptr dosmode
+Pm16len dw $
+Pm16 ends
+
+
+Pm32 segment para  use32
+assume cs:Pm32
+mov ax,18h
+mov ds,ax
+mov ax,20h
+mov es,ax
+mov ax,28h
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov esp,1000h
+cmp Dword ptr ds:[currentposVESA],0
+jz FIRST_switch_VESA
+
+xor esi,esi
+mov si,offset bufferVESA
+mov Edi,ds:[currentposVESA]
+cmp dword ptr ds:[videomodeflag],1
+jz arrow_64x64x8_0
+call restoreVESA
+jmp FIRST_switch_VESA
+arrow_64x64x8_0:
+call restorevesa4
+
+FIRST_switch_VESA:
+mov al,ds:[DELTAX]
+movsx ax,al
+add ds:[mousex],ax
+mov al,ds:[deltaY]
+movsx ax,al
+sub ds:[mousey],ax
+mov eax,dword ptr ds:[mousey]
+mov ebx,dword ptr ds:[scanline]
+mul ebx
+add eax,dword ptr ds:[mousex]
+cmp dword ptr ds:[videomodeflag],1
+jnz not32bit
+shl eax,2
+not32bit:
+mov ds:[currentposVESA],Eax
+
+mov Edi,ds:[currentposVESA]
+xor esi,esi
+mov si,offset buffervesa
+cmp dword ptr ds:[videomodeflag],1
+jz arrow_64x64x8_1
+call saveVESA
+jmp arrow_64x64x8_2
+arrow_64x64x8_1:
+call savevesa4
+
+arrow_64x64x8_2:
+xor esi,esi
+mov Edi,ds:[currentposVESA]
+cmp dword ptr ds:[videomodeflag],1
+jz arrow_64x64x8_3
+mov si,offset bmpdataVESA
+call showmouseVESA
+jmp arrow_64x64x8_4
+arrow_64x64x8_3:
+mov si,offset bmpdataVESA4
+call showmousevesa4
+
+arrow_64x64x8_4:
+test byte ptr ds:[mousestatus],1
+jz mouse_vesa_ret
+cmp dword ptr ds:[videomodeflag],1
+jz show_32bit_arrow
+
+mov edi,dword ptr ds:[currentposVesa]
+mov eax,dword ptr ds:[scanline]
+mov ebx,ds:[LineWidth]
+shr ebx,1
+mul ebx
+sub edi,eax
+;add edi,ebx
+
+
+mov eax,ds:[Linecolor]
+mov ecx,ds:[LineWidth]
+drawDotx8:
+push ecx
+push edi
+rep stosb
+pop edi
+add edi,dword ptr ds:[scanline]
+pop ecx
+loop drawDotx8
+jmp mouse_vesa_ret
+
+show_32bit_arrow:
+
+mov edi,ds:[currentposVesa]
+mov eax,dword ptr ds:[scanline]
+shl eax,2
+mov ds:[scanlineByte],eax
+mov ebx,ds:[LineWidth]
+;push ebx
+shr ebx,1
+mul ebx
+sub edi,eax
+;pop ebx
+;shl ebx,2
+;shr ebx,1
+;add edi,ebx
+
+mov eax,ds:[LineColor]
+mov ecx,ds:[lineWidth]
+drawDot32:
+push ecx
+push edi
+rep stosd
+pop edi
+add edi,ds:[scanlineByte]
+pop ecx
+loop drawDot32
+
+mouse_vesa_ret:
+db 0eah
+dw offset todos
+dw 0
+dw 8
+
+
+
+
+
+showmouseVESA4 proc near
+mov Ecx,32
+show_line_32x32x32:
+push Ecx
+push Edi
+mov Ecx,32
+show_32x32x32:
+lodsd
+cmp eax,0ffffffh
+jge notshow_white
+stosd
+loop show_32x32x32
+jmp show_next_line
+notshow_white:
+and eax,es:[edi]
+stosd
+loop show_32x32x32
+show_next_line:
+pop Edi
+mov eax,dword ptr ds:[scanline]
+shl eax,2
+add edi,eax
+pop Ecx
+loop show_line_32x32x32
+ret
+showmouseVESA4 endp
+
+
+
+saveVESA4 proc near
+mov Ecx,32
+save_line_32x32x32:
+push Ecx
+push Edi
+mov Ecx,32
+save_32x32x32:
+mov eax,es:[Edi]
+mov ds:[Esi],eax
+add esi,4
+add edi,4
+loop save_32x32x32
+pop Edi
+mov eax,dword ptr ds:[scanline]
+shl eax,2
+add edi,eax
+pop Ecx
+loop save_line_32x32x32
+ret
+saveVESA4 endp
+
+
+
+restoreVESA4 proc near
+mov Ecx,32
+res_line_32x32x32:
+push Ecx
+push Edi
+mov Ecx,32
+rep movsd
+pop Edi
+mov eax,dword ptr ds:[scanline]
+shl eax,2
+add edi,eax
+pop Ecx
+loop res_line_32x32x32
+ret
+restoreVESA4 endp
+
+
+
+showmouseVESA proc near
+mov Ecx,64
+show_line_64x64x8:
+push Ecx
+push Edi
+mov Ecx,64
+show_64x64x8:
+lodsb
+cmp al,0FFH
+jnz notANDvesa
+and AL,BYTE PTR ES:[eDI]
+notANDvesa:
+stosb
+loop show_64x64x8
+pop Edi
+add edi,dword ptr ds:[scanline]
+pop Ecx
+loop show_line_64x64x8
+ret
+showmouseVESA endp
+
+
+
+saveVESA proc near
+mov Ecx,64
+save_line_64x64x8:
+push Ecx
+push Edi
+mov Ecx,64
+save_64x64x8:
+mov al,es:[Edi]
+mov ds:[Esi],al
+inc Esi
+inc Edi
+loop save_64x64x8
+pop Edi
+add edi,dword ptr ds:[scanline]
+pop Ecx
+loop save_line_64x64x8
+ret
+saveVESA endp
+
+
+
+restoreVESA proc near
+mov Ecx,64
+res_line_64x64x8:
+push Ecx
+push Edi
+mov Ecx,64
+rep movsb
+pop Edi
+add edi,dword ptr ds:[scanline]
+pop Ecx
+loop res_line_64x64x8
+ret
+restoreVESA endp
+
+Pm32len dd $				;why can not use "dw $" ??
+
+Pm32 ends
+
+
+
+
+code segment para use16
+assume cs:code
+start:
+mov ax,mouse
+mov ds,ax
+
+mov ax,3d00h
+mov dx,offset mousebmp
+int 21h
+mov bx,ax
+mov ax,3f00h
+mov cx,436h
+mov dx,offset bmphead
+int 21h
+mov ax,3f00h
+mov cx,1024
+mov dx,OFFSET bmpdata
+int 21h
+
+mov si,offset bmpdata
+mov di,si
+add di,1023
+sub di,32
+mov cx,16
+copy0:
+push cx
+push si
+push di
+mov cx,32
+copy1:
+mov al,ds:[si]
+mov ah,ds:[di]
+xchg ah,al
+mov ds:[si],al
+mov ds:[di],ah
+inc si
+inc di
+loop copy1
+pop di
+pop si
+add si,32
+sub di,32
+pop cx
+loop copy0
+MOV AX,3E00H
+INT 21H
+
+
+mov ax,3d00h
+mov dx,offset mouseBMPVESA
+int 21h
+mov bx,ax
+mov ax,3f00h
+mov cx,436h
+mov dx,offset bmpheadVESA
+int 21h
+mov ax,3f00h
+mov cx,4096
+mov dx,OFFSET bmpdataVESA
+int 21h
+
+mov si,offset bmpdataVESA
+mov di,si
+add di,4095
+sub di,64
+mov cx,32
+copyVESA0:
+push cx
+push si
+push di
+mov cx,64
+copyVESA1:
+mov al,ds:[si]
+mov ah,ds:[di]
+xchg ah,al
+mov ds:[si],al
+mov ds:[di],ah
+inc si
+inc di
+loop copyVESA1
+pop di
+pop si
+add si,64
+sub di,64
+pop cx
+loop copyVESA0
+MOV AX,3E00H
+INT 21H
+
+mov ax,3d00h
+mov dx,offset mouseBMPVESA4
+int 21h
+mov bx,ax
+mov ax,3f00h
+mov cx,36h
+mov dx,offset bmpheadVESA4
+int 21h
+mov ax,3f00h
+mov cx,4096
+mov dx,OFFSET bmpdataVESA4
+int 21h
+
+mov si,offset bmpdataVESA4
+mov di,si
+add di,4096
+sub di,128
+mov cx,16
+copyVESA04:
+push cx
+push si
+push di
+mov cx,32
+copyVESA14:
+mov eax,ds:[si]
+mov ebx,ds:[di]
+xchg eax,ebx
+mov ds:[si],eax
+mov ds:[di],ebx
+add si,4
+add di,4
+loop copyVESA14
+pop di
+pop si
+add si,128
+sub di,128
+pop cx
+loop copyVESA04
+MOV AX,3E00H
+INT 21H
+
+mov ax,Pm16
+mov fs,ax
+mov ax,Pm32
+mov gs,ax
+mov ax,mouse
+mov es,ax		;from now on ds==es==mouse
+mov es:[mouseseg],ax 	;mouse int seg!!!!!
+			
+mov di,offset vesainfo
+mov ax,4f01h
+mov cx,101h
+int 10h
+mov si,offset vesainfo
+add si,40
+lodsd
+mov word ptr ds:[gdt4+2],ax
+shr eax,16
+mov byte ptr ds:[gdt4+4],al
+mov byte ptr ds:[gdt4+7],ah
+xor eax,eax
+mov ax,ds:[mouseseg]			;set mouse int data selector
+shl eax,4
+mov word ptr ds:[gdt3+2],ax
+shr eax,16
+mov byte ptr ds:[gdt3+4],al
+
+call initmouse
+;call resident				;reallocation memory is complexy!
+					;but ah=31h/21h is simple
+call SetMouseInt
+
+mov ax,3100h
+mov dx,es:[mouselen]
+add dx,ds:[codelen]
+add dx,fs:[Pm16len]
+add dx,word ptr gs:[Pm32len]
+add dx,0fh
+add dx,0fh
+add dx,0fh
+add dx,0fh
+shr dx,4
+add dx,40h
+int 21h
+
+
+
+
+SetMouseInt proc near
+push es
+in al,0a1h
+or al,10h
+out 0a1h,al
+cli
+cld
+mov ax,0
+mov es,ax
+mov di,74h
+shl di,2
+stosw
+mov ax,ds:[mouseseg]
+stosw
+in al,0a1h
+and al,0efh
+out 0a1h,al
+in al,21h
+and al,0fbh
+out 21h,al
+pop es
+sti
+ret
+SetMouseInt endp
+
+
+
+initmouse proc near
+call wait_ibf_empty
+mov al,0adh
+out 64h,al
+call wait_ibf_empty
+mov al,0a8h
+out 64h,al
+
+call wait_ibf_empty
+mov al,0d4h
+out 64h,al
+mouse_command:
+call wait_ibf_empty
+mov al,0f4h
+out 60h,al
+call wait_obf_full
+in al,60h
+cmp al,0fah
+jnz mouse_command
+call wait_ibf_empty
+mov al,60h
+out 64h,al
+call wait_ibf_empty
+mov al,47h
+out 60h,al
+call wait_ibf_empty
+
+jmp l1
+
+l3:
+call Wait_Ibf_Empty
+mov al,0d4h
+out 64h,al
+call Wait_Ibf_empty
+mov al,0f2h
+out 60h,al
+call Wait_Obf_FUll
+l0:
+in al,60h
+cmp al,0fah
+jnz l0
+in al,60h
+cmp al,0
+jz l1
+mov byte ptr ds:[PacketNum],4
+jmp l2
+l1:
+mov byte ptr ds:[PacketNum],3
+l2:
+
+
+l5:
+mov al,0aeh
+out 64h,al
+ret
+initmouse endp
+
+
+
+wait_obf_full proc near
+in al,64h
+test al,1
+jz wait_obf_full
+ret
+wait_obf_full endp
+
+
+
+wait_ibf_empty proc near
+in al,64h
+test al,2
+jnz wait_ibf_empty
+ret
+wait_ibf_empty endp
+
+
+
+resident proc near
+push ds
+push es
+mov ax,code
+mov ds,ax
+mov ax,mouse
+mov es,ax
+sub ax,10h
+push ax
+
+mov ax,4a00h
+mov bx,es:[mouselen]
+add bx,ds:[codelen]
+add bx,0fh
+add bx,0fh
+shr bx,4
+add bx,20h
+pop es
+int 21h
+jnc realloc_success
+
+realloc_error:
+mov ax,mouse
+mov ds,ax
+mov ah,9
+mov dx,offset msg_realloc_error
+int 21h
+jmp resident_return
+
+realloc_success:
+mov ax,mouse
+mov es,ax
+mov ax,4800h
+mov bx,es:[mouselen]
+add bx,0fh
+shr bx,4
+add bx,10h
+int 21h
+jnc get_bmp_base
+jmp realloc_error
+
+get_bmp_base:
+mov es:[mouseseg],ax
+
+mov ax,mouse
+mov ds,ax
+mov ah,9
+mov dx,offset msg_load_success
+int 21h
+
+resident_return:
+pop es
+pop ds
+retn
+resident endp
+
+
+codelen dw $
+code ends
+end start

@@ -1,0 +1,95 @@
+.386p
+data segment para use16
+bmpname db 'f:\asm\bmp\2.bmp',00
+bmphandle dw 0
+bmpdetail dw 0
+bmppage dw 0
+
+gdtlen dw 0fh
+gdtbase dd 0
+gdt0 dq 0
+gdt1 dq 0d0cf92000000ffffh
+data ends
+
+code segment para use16
+assume cs:code
+start:
+mov ax,data
+mov ds,ax
+mov es,ax
+cld
+mov di,offset bmphandle
+mov ax,3d00h
+mov dx,offset bmpname
+int 21h
+stosw
+
+mov bx,ax
+mov ax,4202h
+mov cx,0
+mov dx,0
+int 21h
+stosw
+mov ax,dx
+stosw
+
+xor eax,eax
+mov ebx,eax
+mov ax,data
+shl eax,4
+mov bx,offset gdt0
+add eax,ebx
+mov dword ptr ds:[gdtbase],eax
+
+in al,0eeh
+cli
+lgdt qword ptr ds:[gdtlen]
+mov eax,cr0
+or al,1
+mov cr0,eax
+mov bx,8
+mov fs,bx
+and al,0feh
+mov cr0,eax
+
+sti
+mov ax,4f02h
+mov bx,112h
+int 10h
+mov ax,4f06h
+mov bx,0
+mov cx,640
+int 10h
+
+mov ax,4200h
+mov bx,es:[bmphandle]
+mov cx,0
+mov dx,36h
+int 21h
+
+mov ax,02000h
+mov ds,ax
+
+mov ax,3f00h
+mov cx,0ffffh
+mov dx,0
+int 21h
+
+mov ecx,163840h
+mov esi,0
+mov edi,0
+l0:
+mov eax,dword ptr ds:[esi]
+mov dword ptr fs:[edi],eax
+add si,4
+add di,4
+dec ecx
+cmp ecx,0
+jnz l0
+mov ax,3
+int 10h
+mov ah,4ch
+int 21h
+
+code ends
+end start

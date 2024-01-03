@@ -1,0 +1,96 @@
+.386P
+CODE SEGMENT PAGE USE16
+ASSUME CS:CODE
+start:
+MOV AX,0
+mov es,ax
+mov di,0
+stosw
+mov ax,1000h
+stosw
+
+mov di,10h
+mov ax,0
+stosw
+mov ax,2000h
+stosw
+
+mov ax,CODE
+mov ds,ax
+
+mov ax,1000h
+mov es,ax
+mov di,0
+mov si,offset int0proc
+mov cx,int0proclen
+rep movsb
+
+
+mov ax,CODE
+mov ds,ax
+mov ax,2000h
+mov es,ax
+mov di,0
+mov si,offset int4proc
+mov cx,int4proclen
+rep movsb
+
+MOV AH,4CH
+INT 21H
+
+int0proc LABEL BYTE
+pop si
+pop di
+add si,2
+
+push di
+push si
+
+push ax
+push dx
+PUSH BX
+push ds
+
+MOV AX,1000H
+MOV DS,AX
+JMP L0
+INT0MESSAGE DB "DIVIDEN ERROR!",0AH,0DH,24H
+L0:
+mov ah,9
+MOV dx,OFFSET int0MESSAGE
+MOV BX,OFFSET INT0PROC
+SUB DX,BX
+int 21h
+
+pop ds
+POP BX
+pop dx
+pop ax
+iret
+int0proclen=$-int0proc
+
+
+int4proc LABEL BYTE
+push ax
+push dx
+push bx
+push ds
+
+mov ax,2000H
+mov ds,ax
+JMP L1
+INT4MESSAGE DB "OVERFLOW",0AH,0DH,24H
+L1:
+mov ah,9
+MOV dx,OFFSET INT4MESSAGE
+MOV BX,OFFSET INT4PROC
+SUB DX,BX
+int 21h
+pop ds
+pop bx
+Pop dX
+pop ax
+iret
+int4proclen=$-int4proc
+CODE ENDS
+end start

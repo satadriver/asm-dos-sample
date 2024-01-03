@@ -1,0 +1,389 @@
+.386p
+tssseg0 segment para use16
+dd 0
+dd 1000h
+dd 58h
+dd 1000h
+dd 61h
+dd 1000h
+dd 6ah 
+dd 18 dup (0)
+dw 0
+dw $+2
+db 0ffh
+tssseg0 ends
+
+tssseg1 segment para use16
+dd 0
+dd 1000h
+dd 58h
+dd 1000h
+dd 61h
+dd 1000h
+dd 6ah
+dd 0 ;CR3
+dd 0 ;eip
+dd 0 ;EFLAGES
+dd 0 ;EAX
+dd 0 ;ecx
+DD 0 ;EDX
+DD 0 ;EBX
+DD 1000H ;ESP
+dd 0  ;EBP
+DD 0  ;ESI
+DD 0  ;EDI
+DD 50H ;ES
+dd 28h ;cs
+dd 58H ;SS
+dD 50H ;DS
+DD 50H ;FS
+DD 50H ;GS
+dd 0   ;LDT
+DW 0   ;T
+dw $+2 ;I/0 MAP
+db 0ffh
+tssseg1 ends
+
+tssseg2 segment para use16
+dd 0           ;chain
+dd 1000h       ;ESP0
+dd 58h         ;SS0
+dd 1000h       ;ESP1
+dd 61h         ;SS1
+dd 1000h       ;ESP2
+dd 6ah         ;SS2
+dd 0             ;cr3
+dd 0             ;eip
+dd 0             ;eflages
+dd 4 dup (0)     ;EAX-EBX
+dd 400H          ;ESP=400H
+DD 3 DUP (0)     ;EBP,ESI,EDI
+DD 50H
+dd 38h           ;cs
+dd 58h           ;ss
+dd 50H     ;DS,FS,GS,LDR
+DD 50H
+DD 50H
+DD 0
+dw 0
+dw $+2
+db 0ffh
+tssseg2 ends
+
+gdtpointer segment para use16
+gdtlimit1 dw gdtlen-1                      ;global variable gdtlen
+gdtbase1 dd 0
+gdtpointer ends
+
+gdtseg segment para use16
+gdtlimit dw gdtlen-1
+gdtbase dd 0
+
+gdt0 dq 0
+gdt1 dq 000098000000ffffh
+gdt2 dq 004098000000ffffh
+gdt3 dq 004098000000ffffh
+gdt4 dq 0040f8000000ffffh
+gdt5 dq 004098000000ffffh
+gdt6 dq 004098000000ffffh
+gdt7 dq 000098000000ffffh
+gdt8 dq 0
+
+gdt9  dq 0000920b8000ffffh
+gdt10 dq 0040f20a0000ffffh
+
+gdt11 dq 0040920000001000h ;stack0
+gdt12 dq 0040b20000001000h
+gdt13 dq 0040d20000001000h
+gdt14 dq 0040f20000001000h
+gdt15 dq 0000920000001000h
+ 
+gdt16 dq 0040e90000000068h ;tss0
+gdt17 dq 0040e90000000068h
+gdt18 dq 0040e90000000068h  ;tss2
+
+gdt19 dq 0000e50000880000h ;taskgate0
+gdt20 dq 0000e50000800000h
+gdt21 dq 0000e50000900000h
+
+gdt22 dq 0000ec0000100000h
+gdt23 dq 0000ec0000000000h
+gdt24 dq 0000ec0000380000h
+gdt25 dq 00008c0000100000h
+gdtlen=$-gdt0
+gdtseg ends
+
+stack0 segment para use16
+db 1000h dup (0)
+stack0 ends
+stack1 segment para use16
+db 1000h dup (0)
+stack1 ends
+stack2 segment para use16
+db 1000h dup (0)
+stack2 ends
+stack3 segment para use16
+db 1000h dup (0)
+stack3 ends
+
+code1 segment para use16
+assume cs:code1
+db 09ah
+dw 0
+dw 00c8h
+
+toreal:
+mov eax,cr0
+and al,0feh
+mov cr0,eax
+jmp far ptr real
+code1 ends
+
+code2 segment para  use32
+assume cs:code2
+mov ax,80h
+ltr ax
+mov ax,50h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ax,58h
+mov ss,ax
+mov esp,1000h
+mov ecx,0ffffh
+mov di,0
+mov al,1
+rep stosb
+
+lll:
+in al,60h
+cmp al,1
+jnz lll
+db 09ah
+dw 0
+dw 0
+dw 18h
+code2 ends
+
+code3 segment para use32
+assume cs:code3
+mov eax,73h
+push eax
+mov eax,200h
+push eax
+mov eax,23h
+push eax
+mov eax,0
+push eax
+retf
+code3 ends
+
+code4 segment para use32
+assume cs:code4
+mov cx,0ffffh
+mov di,0
+mov al,2
+rep stosb
+l1:in al,60h
+cmp al,39h
+jnz l1
+db 09ah
+dw 0
+dw 0
+dw 98h
+code4 ends
+
+
+code5 segment para use32
+assume cs:code5
+mov cx,0fffh
+mov di,0
+mov al,3
+rep stosb
+l2:in al,60h
+cmp al,1ch
+jnz l2
+
+mov ax,0ffffh
+l4:
+mov cx,0ffffh
+l5:dec cx
+cmp cx,0
+jnz l5
+dec ax
+cmp ax,0
+jnz l4
+
+db 0Eah
+dw offset toreal ;OFFSET CAN BE ANYONE,BE DISPOSED
+dw 0
+dw 90h
+code5 ends
+
+code6 segment para use32
+assume cs:code6
+db 0Eah
+dw 0
+
+dw 0
+dw 0c0h
+code6 ends
+
+code7 segment para use16
+assume cs:code7
+mov ax,48h
+mov ds,ax
+mov es,ax
+mov fs,ax
+mov gs,ax
+mov ss,ax
+mov eax,cr0
+and al,0feh
+mov cr0,eax
+jmp far ptr real
+code7 ends
+
+code0 segment para  use16
+assume cs:code0,ds:gdtseg,es:gdtpointer,ss:stack0
+start:
+mov ax,gdtseg
+mov ds,ax
+mov ax,gdtpointer
+mov es,ax
+;mov ax, stack0
+;mov ss,ax
+
+xor eax,eax
+mov ax,gdtseg
+shl eax,4
+xor ebx,ebx
+mov bx,offset gdt0
+add eax,ebx
+mov dword ptr ds:[gdtbase],eax
+
+xor eax,eax
+mov ax,stack0
+shl eax,4
+mov word ptr ds:[gdt11+2],ax
+shr eax,16
+mov byte ptr ds:[gdt11+4],al
+
+xor eax,eax
+mov ax,stack1
+shl eax,4
+mov word ptr ds:[gdt12+2],ax
+shr eax,16
+mov byte ptr ds:[gdt12+4],al
+
+xor eax,eax
+mov ax,stack2
+shl eax,4
+mov word ptr ds:[gdt13+2],ax
+shr eax,16
+mov byte ptr ds:[gdt13+4],al
+
+xor eax,eax
+mov ax,stack3
+shl eax,4
+mov word ptr ds:[gdt14+2],ax
+shr eax,16
+mov byte ptr ds:[gdt14+4],al
+
+xor eax,eax
+mov ax,tssseg0
+shl eax,4
+mov word ptr ds:[gdt16+2],ax
+shr eax,16
+mov byte ptr ds:[gdt16+4],al
+mov byte ptr ds:[gdt16+7],ah
+
+
+xor eax,eax
+mov ax,tssseg1
+shl eax,4
+mov word ptr ds:[gdt17+2],ax
+shr eax,16
+mov byte ptr ds:[gdt17+4],al
+mov byte ptr ds:[gdt17+7],ah
+
+xor eax,eax
+mov ax,tssseg2
+shl eax,4
+mov word ptr ds:[gdt18+2],ax
+shr eax,16
+mov byte ptr ds:[gdt18+4],al
+mov byte ptr ds:[gdt18+7],ah
+
+xor eax,eax
+mov ax,code1
+shl eax,4
+mov word ptr ds:[gdt1+2],ax
+shr eax,16
+mov byte ptr ds:[gdt1+4],al
+
+xor eax,eax
+mov ax,code2
+shl eax,4
+mov word ptr ds:[gdt2+2],ax
+shr eax,16
+mov byte ptr ds:[gdt2+4],al
+
+xor eax,eax
+mov ax,code3
+shl eax,4
+mov word ptr ds:[gdt3+2],ax
+shr eax,16
+mov byte ptr ds:[gdt3+4],al
+
+xor eax,eax
+mov ax,code4
+shl eax,4
+mov word ptr ds:[gdt4+2],ax
+shr eax,16
+mov byte ptr ds:[gdt4+4],al
+
+xor eax,eax
+mov ax,code5
+shl eax,4
+mov word ptr ds:[gdt5+2],ax
+shr eax,16
+mov byte ptr ds:[gdt5+4],al
+
+xor eax,eax
+mov ax,code6
+shl eax,4
+mov word ptr ds:[gdt6+2],ax
+shr eax,16
+mov byte ptr ds:[gdt6+4],al
+
+xor eax,eax
+mov ax,code7
+shl eax,4
+mov word ptr ds:[gdt7+2],ax
+shr eax,16
+mov byte ptr ds:[gdt7+4],al
+
+mov ax,13h
+int 10h
+cli
+mov al,2
+out 92h,al
+lgdt qword ptr ds:[gdtlimit]
+mov eax,cr0
+or al,1
+mov cr0,eax
+db 09ah
+dw 0
+dw 8
+
+real:
+mov ax,stack0
+mov ss,ax
+mov ax,3
+int 10h
+mov ah,4ch
+int 21h
+code0 ends
+end start
+
